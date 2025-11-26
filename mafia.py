@@ -1,6 +1,7 @@
 ## Game logic
 from game import Game
 from typing import List
+from player import Player
 import voice
 import sys
 
@@ -8,6 +9,8 @@ night_phase = False
 day_phase = False
 voting_phase = False
 mafias = []
+
+game = Game(["-n","10"])
 
 #Setup Phase
 #Everyone put head down
