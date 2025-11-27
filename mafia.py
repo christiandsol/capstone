@@ -3,14 +3,29 @@ from game import Game
 from typing import List
 from player import Player
 import voice
+import random
 import sys
 
 night_phase = False
 day_phase = False
 voting_phase = False
 mafias = []
+civilians = []
+innocentsAlive = 8
+mafiaAlive = 2
 
 game = Game(["-n","10"])
+mafiaOne, mafiaTwo, doctorNum = random.sample(range(1, 11), 3)
+for playerNum in range(game.numPeople):
+    if (playerNum == mafiaOne or playerNum == mafiaTwo):
+        newPlayer = Player(playerNum, "", True, False, True)
+        mafias.append(newPlayer)
+    elif (playerNum == doctorNum):
+        newPlayer = Player(playerNum, "", False, True, True)
+        civilians.append(newPlayer)
+    else:
+        newPlayer = Player(playerNum, "", False, False, True)
+        civilians.append(newPlayer)
 
 #Setup Phase
 #Everyone put head down
@@ -29,6 +44,10 @@ while True:
         #computer tells nurse to face up and gesture who they want to save
         #nurse gestures and puts head down
         #computer tells everyone to put face up
+        #final check of night phase for win conditions
+        if mafiaAlive >= innocentsAlive:
+            #mafia win screen
+            .
     while day_phase == True:
         voice.listen_for_okay_mafia()
         #Storytelling Aspect for Q2
@@ -45,6 +64,13 @@ while True:
         #Amount of votes for players shown on display screen
         #If Majority, player gets voted out and continue to night phase
         #Else continue to night phase
+        #final check of voting phase for win conditions
+        if mafiaAlive >= innocentsAlive:
+            #mafia win screen
+            .
+        elif mafiaAlive == 0:
+            #civilian win screen
+            .
 
 
 #if __name__ == "__main__":
