@@ -6,6 +6,11 @@ from typing import List
 mp_face = mp.solutions.face_mesh
 mp_drawing = mp.solutions.drawing_utils
 
+# Number to body attribute mappings
+NOSE = 1
+CHIN = 152
+FOREHEAD = 10
+
 class Game:
     def __init__(self, args: List[str]):
         for i, arg in enumerate(args):
@@ -19,13 +24,14 @@ class Game:
         """
         sets up the camera, assigns number to every person
         """
-        cap = cv2.VideoCapture(1, cv2.CAP_AVFOUNDATION)
+        cap = cv2.VideoCapture(1, cv2.CAP_AVFOUNDATION) ## TEST: AVFOUNDATION MIGHT ONLY WORK FOR MACS
         time.sleep(0.5)  # give the camera time to initialize
         if not cap.isOpened():
             print("Cannot open camera")
             exit()
         return cap
     def headsDown(self) -> int: 
+        # [1, 3]
         """
         continues until: 
         - only 1 person (mafia) has their head up and gestures who to kill
@@ -50,9 +56,9 @@ class Game:
                 if results.multi_face_landmarks:
                     for face_landmarks in results.multi_face_landmarks:
                         h, w, _ = frame.shape
-                        nose_tip = face_landmarks.landmark[1]
-                        chin = face_landmarks.landmark[152]
-                        forehead = face_landmarks.landmark[10]
+                        nose_tip = face_landmarks.landmark[NOSE]
+                        chin = face_landmarks.landmark[CHIN]
+                        forehead = face_landmarks.landmark[FOREHEAD]
 
                         nose_y = int(nose_tip.y * h)
                         chin_y = int(chin.y * h)

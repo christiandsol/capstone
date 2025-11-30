@@ -2,7 +2,6 @@
 from game import Game
 from typing import List
 import sys
-
 #Setup Phase
 #Everyone put head down
 #Random player chosen as mafia
