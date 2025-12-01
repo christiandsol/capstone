@@ -3,12 +3,71 @@ import json
 import select
 import sys
 from collections import deque
+from player import Player
 from util import send_json, receive_json, print_dic
+from voice import listen_for_command
+from player import Player
+from typing import Dict, Union, List
 
 # Socket setup
 HOST = "0.0.0.0"
 PORT = 5050
 MAX_PLAYERS = 10
+
+class MafiaGame:
+    def __init__(self, players: int):
+        self.state = "LOBBY"
+        self.players = set()
+        self.expected_signals = {"setup"}
+        self.player_cap = players 
+        self.last_signal = []  # An array of dictionaries for each player, mapping all signals to the LAST signal received of that type
+        # i.e an array 
+
+    def valid_signal(self, signal: Dict[str, Union[str, int]]):
+        """Check if the signal action is allowed in this state"""
+        return signal["action"] in self.expected_signals
+
+    def add_player(self, player_id: int):
+        """
+        Add player to player set
+        """
+        self.players.add(player_id)
+
+    def update(self, signal_queue: List[Dict[str, Union[str,int]]]):
+        """
+        Consume only the signals that matter for the current state.
+        Ignore or discard others.
+        """
+
+        if self.state == "LOBBY":
+            while signal_queue:
+                sig = signal_queue.popleft()
+
+                if sig["action"] == "setup":
+                    print("ADDING PLAYER WITH ADD_PLAYER")
+                    self.add_player(sig["player"])
+                    print(self.players)
+
+            if len(self.players) >= self.player_cap:
+                print("All players connected — starting game!")
+                command = listen_for_command()
+                if command == "ready":
+                    print("Rizzy")
+                    self.state = "NIGHT"
+                    self.expected_signals = {"headUp", "headDown"}
+
+        elif self.state == "NIGHT":
+            while signal_queue:
+                sig = signal_queue.popleft()
+                print(f"[Night Signal] {sig}")
+
+        elif self.state == "DAY":
+            while signal_queue:
+                sig = signal_queue.popleft()
+                print(f"[Day Signal] {sig}")
+
+
+
 
 def main():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -29,6 +88,7 @@ def main():
     # Central signal queue
     signal_queue = deque()
 
+    game = MafiaGame(2)
     while True:
         readable, _, _ = select.select(sockets, [], [], 0.05)
 
@@ -67,8 +127,21 @@ def main():
                     del clients[sock]
                     sock.close()
                     continue
-
                 player = clients[sock]
+                msg["player"] = player
+
+
+                if game.valid_signal(msg):
+                    signal_queue.append(msg)
+                else:
+                    print(f"Ignoring signal {msg} — not valid now")
+
+        game.update(signal_queue)
+
+    # Cleanup
+    for c in list(clients.keys()):
+        c.close()
+    server.close()
 
 if __name__ == "__main__":
     main()

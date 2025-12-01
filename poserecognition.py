@@ -154,7 +154,8 @@ class Pose:
 
 
 if __name__ == "__main__":
-    RECEIVER_IP = "172.28.134.167"
+    RECEIVER_IP = "172.16.7.4"
     PORT = 5050
     pose = Pose(["-n", "10"])
+    pose.setup()
     pose.detect_head_position(RECEIVER_IP, PORT)
