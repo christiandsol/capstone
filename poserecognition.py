@@ -1,0 +1,158 @@
+import cv2
+import time
+import mediapipe as mp
+from typing import Optional
+from typing import List
+from player import Player
+from util import send_json, receive_json, client_connect, client_close, NOSE, CHIN, FOREHEAD
+
+mp_face = mp.solutions.face_mesh
+mp_drawing = mp.solutions.drawing_utils
+
+
+# DATAFORMAT: 
+# {
+#     "player": player_id,
+#     "action": "vote/kill/heal/headmovement/setup"
+#     "target": player_id/null
+# }
+
+class Pose:
+    def __init__(self, args: List[str]):
+        for i, arg in enumerate(args):
+            print("Arg: ", arg)
+            match arg:
+                case "-n": 
+                    self.numPeople = int(args[i + 1])
+
+    def setup(self) -> cv2.VideoCapture:
+        """
+        sets up the camera, assigns number to every person
+        """
+        cap = cv2.VideoCapture(1, cv2.CAP_AVFOUNDATION) ## TEST: AVFOUNDATION MIGHT ONLY WORK FOR MACS
+        time.sleep(0.5)  # give the camera time to initialize
+        if not cap.isOpened():
+            print("Cannot open camera")
+            exit()
+        return cap
+
+    def detect_head_position(self, RECEIVER_IP, PORT):
+        """
+        Detects head position (up or down) for a single person and sends
+        signals to server whenever the state changes.
+        No face detected = heads down
+        """
+        # Connect to server
+        client = client_connect(RECEIVER_IP, PORT)
+        print(f"Connected to server at {RECEIVER_IP}:{PORT}")
+        
+        # Send setup signal and receive player ID from server
+        print("Sending setup signal to server...")
+        send_json(client, -1, "setup", None)  # Use -1 as placeholder player_id
+        
+        # Wait for server to send back player ID
+        print("Waiting for player ID from server...")
+        response = receive_json(client)
+        PLAYER_ID = response.get("player_id", 0)
+        
+        print("=" * 50)
+        print(f"ASSIGNED PLAYER ID: {PLAYER_ID}")
+        print("=" * 50)
+        
+        cap = self.setup()
+        previous_state: Optional[str] = None
+        
+        with mp_face.FaceMesh(
+            max_num_faces=1,  # Only track one person
+            refine_landmarks=True,
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5
+        ) as face_mesh:
+            
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    print("Failed to grab frame")
+                    break
+
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                results = face_mesh.process(frame_rgb)
+
+                current_state = None
+                display_text = "No face detected - Head: DOWN"
+
+                if results.multi_face_landmarks:
+                    face_landmarks = results.multi_face_landmarks[0]  # Only use first face
+                    
+                    h, w, _ = frame.shape
+                    nose_tip = face_landmarks.landmark[NOSE]
+                    chin = face_landmarks.landmark[CHIN]
+                    forehead = face_landmarks.landmark[FOREHEAD]
+
+                    nose_y = int(nose_tip.y * h)
+                    chin_y = int(chin.y * h)
+                    forehead_y = int(forehead.y * h)
+
+                    head_height = chin_y - forehead_y
+                    nose_pos_relative = nose_y - forehead_y
+
+                    # Determine current head state
+                    if nose_pos_relative < head_height * 0.666666:
+                        current_state = "headUp"
+                        display_text = "Head: UP"
+                    else:
+                        current_state = "headDown"
+                        display_text = "Head: DOWN"
+                    
+                    # Draw face mesh
+                    mp_drawing.draw_landmarks(
+                        frame, 
+                        face_landmarks, 
+                        mp_face.FACEMESH_TESSELATION
+                    )
+                else:
+                    # No face detected = heads down
+                    current_state = "headDown"
+
+                # Check if state changed
+                if previous_state is not None and previous_state != current_state:
+                    # State flip-flopped - send signal to server
+                    print(f"State changed: {previous_state} -> {current_state}")
+                    send_json(client, PLAYER_ID, current_state, None)
+                elif previous_state is None:
+                    # First detection - send initial state
+                    print(f"Initial state: {current_state}")
+                    send_json(client, PLAYER_ID, current_state, None)
+
+                previous_state = current_state
+
+                # Display current state and player ID on frame
+                display_with_id = f"Player {PLAYER_ID}: {display_text}"
+                cv2.putText(
+                    frame, 
+                    display_with_id, 
+                    (30, 50), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 
+                    1, 
+                    (0, 255, 0) if current_state == "headUp" else (0, 0, 255), 
+                    2
+                )
+                cv2.imshow("Head Position Tracker", frame)
+
+                # Press 'q' to quit
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    print("\nQuitting...")
+                    break
+
+        # Cleanup
+        cap.release()
+        cv2.destroyAllWindows()
+        client_close(client)
+        print("Camera and connection closed")
+
+
+if __name__ == "__main__":
+    RECEIVER_IP = "172.28.134.167"
+    PORT = 5050
+    pose = Pose(["-n", "10"])
+    pose.detect_head_position(RECEIVER_IP, PORT)
