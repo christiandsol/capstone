@@ -4,7 +4,7 @@ import mediapipe as mp
 from typing import Optional
 from typing import List
 from player import Player
-from util import send_json, receive_json, client_connect, client_close, NOSE, CHIN, FOREHEAD
+from util import print_dic, send_json, receive_json, client_connect, client_close, NOSE, CHIN, FOREHEAD
 
 mp_face = mp.solutions.face_mesh
 mp_drawing = mp.solutions.drawing_utils
@@ -53,7 +53,9 @@ class Pose:
         # Wait for server to send back player ID
         print("Waiting for player ID from server...")
         response = receive_json(client)
-        PLAYER_ID = response.get("player_id", 0)
+        print("RESPONSE....")
+        print_dic(response)
+        PLAYER_ID = response.get("player", 0)
         
         print("=" * 50)
         print(f"ASSIGNED PLAYER ID: {PLAYER_ID}")
