@@ -19,7 +19,9 @@
         ```pip install mediapipe```
 
 # Running
-For right now, we only have the argument -n supported, for number of people in the game, assuming one mafia, so we run like: 
-```python mafia.py -n <numberofpeopleyouwant>```
+Server (RUN FIRST, only need one laptop for this):
+```python server.py```
 
+(in a separate instance) Pose recognition client:
+```python poserecognition.py```
 
