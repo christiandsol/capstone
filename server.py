@@ -2,6 +2,7 @@ import socket
 import json
 import select
 import sys
+import random
 from collections import deque
 from player import Player
 from util import send_json, receive_json, print_dic
@@ -21,6 +22,8 @@ class MafiaGame:
         self.expected_signals = {"setup"}
         self.player_cap = players 
         self.last_signal = []  # An array of dictionaries for each player, mapping all signals to the LAST signal received of that type
+        # Sockets to monitor
+        self.clients : Dict[socket.socket, int]= {}
         # EACH ONE WILL BE:
         # {"head"}
         # i.e an array 
@@ -54,8 +57,20 @@ class MafiaGame:
                 print("All players connected — starting game!")
                 command = listen_for_command()
                 if command == "ready":
-                    self.state = "NIGHT"
-                    self.expected_signals = {"headUp", "headDown"}
+                    self.state = "ASSIGN"
+                    self.expected_signals = {}
+
+        if self.state == "ASSIGN":
+            mafia, doctorNum = random.sample(range(1, self.player_cap + 1), 2)
+            for socket, player_id in self.clients.items():
+                if player_id == mafia:
+                    send_json(socket, player_id, "mafia", None)
+                elif player_id == doctorNum:
+                    send_json(socket, player_id, "doctor", None)
+                else:
+                    send_json(socket, player_id, "civilian", None)
+
+
 
         elif self.state == "NIGHT":
             while signal_queue:
@@ -79,8 +94,6 @@ def main():
 
     print(f"Listening on port {PORT}...")
 
-    # Sockets to monitor
-    clients = {}
     next_player_id = 1
 
     # For select()
@@ -100,7 +113,7 @@ def main():
                 conn, addr = server.accept()
                 conn.setblocking(False)
 
-                if len(clients) >= MAX_PLAYERS:
+                if len(game.clients) >= MAX_PLAYERS:
                     print(f"Rejecting {addr} — server full")
                     send_json(conn, {"error": "Server full"})
                     conn.close()
@@ -109,7 +122,7 @@ def main():
                 player_id = next_player_id
                 next_player_id += 1
 
-                clients[conn] = player_id
+                game.clients[conn] = player_id
                 sockets.append(conn)
 
                 send_json(conn, player_id, "player_id", None)
@@ -123,12 +136,12 @@ def main():
 
                 # Disconnect case
                 if msg is None:
-                    print(f"[Disconnected] Player {clients[sock]}")
+                    print(f"[Disconnected] Player {game.clients[sock]}")
                     sockets.remove(sock)
-                    del clients[sock]
+                    del game.clients[sock]
                     sock.close()
                     continue
-                player = clients[sock]
+                player = game.clients[sock]
                 msg["player"] = player
 
 
@@ -140,7 +153,7 @@ def main():
         game.update(signal_queue)
 
     # Cleanup
-    for c in list(clients.keys()):
+    for c in list(game.clients.keys()):
         c.close()
     server.close()
 

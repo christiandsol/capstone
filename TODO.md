@@ -1,11 +1,8 @@
 
 # TODO
 Christian: 
-- [ ] head down pose recognition
-- [ ] send simple json to computer
-my ip addresss:
-192.168.1.108
-
+- [ ] assign to each player a role, tell it to them
+- [ ] Figure out how you're going to process symbols
 
 # Current errors/Possible errors
 - Camera not opening on windows machines

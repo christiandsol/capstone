@@ -35,15 +35,15 @@ class Pose:
 
         if os_name == "Windows":
             num = 0
-            backend = cv2.CAP_DSHOW
+            backend = cv2.CAP_VFW # CHANGE TO D SOMETHING
         else:
             num = 1
             backend = cv2.CAP_AVFOUNDATION
 
         print(f"[Camera] Detected OS: {os_name}, using backend: {backend}")
 
-        cap = cv2.VideoCapture(num, cv2.CAP_AVFOUNDATION) ## TEST: AVFOUNDATION MIGHT ONLY WORK FOR MACS
-        time.sleep(0.5)  # give the camera time to initialize
+        cap = cv2.VideoCapture(num, backend) ## TEST: AVFOUNDATION MIGHT ONLY WORK FOR MACS
+        time.sleep(1)  # give the camera time to initialize
         if not cap.isOpened():
             print("Cannot open camera")
             exit()
@@ -56,6 +56,8 @@ class Pose:
         signals to server whenever the state changes.
         No face detected = heads down
         """
+
+        cap = self.setup()
         # Connect to server
         client = client_connect(RECEIVER_IP, PORT)
         print(f"Connected to server at {RECEIVER_IP}:{PORT}")
@@ -74,8 +76,18 @@ class Pose:
         print("=" * 50)
         print(f"ASSIGNED PLAYER ID: {PLAYER_ID}")
         print("=" * 50)
+
+        response = receive_json(client)
+        role = response.get("action", "None")
+        if role == "mafia":
+            print("YOU ARE MAFIA")
+        elif role == "doctor":
+            print("YOU ARE DOCTOR")
+        elif role == "civilian":
+            print("YOU ARE CIVILIAN")
+        else:
+            print("Error, no role received")
         
-        cap = self.setup()
         previous_state: Optional[str] = None
         
         with mp_face.FaceMesh(
@@ -133,11 +145,9 @@ class Pose:
                 # Check if state changed
                 if previous_state is not None and previous_state != current_state:
                     # State flip-flopped - send signal to server
-                    print(f"State changed: {previous_state} -> {current_state}")
                     send_json(client, PLAYER_ID, current_state, None)
                 elif previous_state is None:
                     # First detection - send initial state
-                    print(f"Initial state: {current_state}")
                     send_json(client, PLAYER_ID, current_state, None)
 
                 previous_state = current_state
@@ -168,8 +178,8 @@ class Pose:
 
 
 if __name__ == "__main__":
-    RECEIVER_IP = "172.28.135.180"
+    RECEIVER_IP = "172.16.7.4"
     PORT = 5050
     pose = Pose(["-n", "10"])
-    pose.setup()
+    # pose.setup()
     pose.detect_head_position(RECEIVER_IP, PORT)
