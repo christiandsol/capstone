@@ -54,7 +54,7 @@ def send_signal_to_server(socket, action, target=None):
     }
 
     try:
-        socket.sendall(json.dumps(msg).encode())
+        socket.sendall(json.dumps(msg).encode('utf-8'))
         socket.close()
         print("[Pi] Sent signal to server: {}".format(msg))
     except Exception as e:
