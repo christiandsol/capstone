@@ -1,8 +1,8 @@
 
 # TODO
 Christian: 
-- [ ] assign to each player a role, tell it to them
-- [ ] Figure out how you're going to process symbols
+- [x] assign to each player a role, tell it to them
+- [x] Figure out how you're going to process signals
 
 # Current errors/Possible errors
 - Camera not opening on windows machines

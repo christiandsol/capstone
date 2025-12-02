@@ -8,7 +8,7 @@ from player import Player
 from util import send_json, receive_json, print_dic
 from voice import listen_for_command
 from player import Player
-from typing import Dict, Union, List
+from typing import Dict, Union, List, Deque
 
 # Socket setup
 HOST = "0.0.0.0"
@@ -21,12 +21,13 @@ class MafiaGame:
         self.players = set()
         self.expected_signals = {"setup"}
         self.player_cap = players 
-        self.last_signal = []  # An array of dictionaries for each player, mapping all signals to the LAST signal received of that type
+        template = {"head": None, "vote": None, "kill": None, "save": None, "setup": False} ## An array of dictionaries for each player, mapping all signals to the LAST signal received of that type
+        self.last_signal = [template.copy() for _ in range(self.player_cap)]
+
         # Sockets to monitor
         self.clients : Dict[socket.socket, int]= {}
-        # EACH ONE WILL BE:
-        # {"head"}
-        # i.e an array 
+        self.mafia, self.doctor = random.sample(range(1, self.player_cap + 1), 2)
+
 
     def valid_signal(self, signal: Dict[str, Union[str, int]]):
         """Check if the signal action is allowed in this state"""
@@ -38,49 +39,55 @@ class MafiaGame:
         """
         self.players.add(player_id)
 
-    def update(self, signal_queue: List[Dict[str, Union[str,int]]]):
+    def check_everyone_in_game(self):
+        for i, state in enumerate(self.last_signal):
+            if state["setup"] == False:
+                return False
+            else:
+                self.add_player(i + 1)
+                print(self.players)
+        return True
+
+
+    def update(self):
         """
         Consume only the signals that matter for the current state.
         Ignore or discard others.
         """
 
         if self.state == "LOBBY":
-            while signal_queue:
-                sig = signal_queue.popleft()
-
-                if sig["action"] == "setup":
-                    print("ADDING PLAYER WITH ADD_PLAYER")
-                    self.add_player(sig["player"])
-                    print(self.players)
-
-            if len(self.players) >= self.player_cap:
+            if self.check_everyone_in_game():
                 print("All players connected — starting game!")
-                command = listen_for_command()
-                if command == "ready":
-                    self.state = "ASSIGN"
-                    self.expected_signals = {}
+                # command = listen_for_command()
+                # if command == "ready":
+                self.state = "ASSIGN"
+                self.expected_signals = {}
 
         if self.state == "ASSIGN":
-            mafia, doctorNum = random.sample(range(1, self.player_cap + 1), 2)
             for socket, player_id in self.clients.items():
-                if player_id == mafia:
+                if player_id == self.mafia:
                     send_json(socket, player_id, "mafia", None)
-                elif player_id == doctorNum:
+                elif player_id == self.doctor:
                     send_json(socket, player_id, "doctor", None)
                 else:
                     send_json(socket, player_id, "civilian", None)
+            # Maybe add a little time.sleep for the transitions
+            print("EVERYONE PUT THEIR HEADS DOWN")
+            self.state = "HEADSDOWN"
 
+        if self.state == "HEADSDOWN": 
+            pass
+            # handle_heads_down(signal_queue)
 
-
-        elif self.state == "NIGHT":
-            while signal_queue:
-                sig = signal_queue.popleft()
-                print(f"[Night Signal] {sig}")
-
-        elif self.state == "DAY":
-            while signal_queue:
-                sig = signal_queue.popleft()
-                print(f"[Day Signal] {sig}")
+        # elif self.state == "NIGHT":
+        #     while signal_queue:
+        #         sig = signal_queue.popleft()
+        #         print(f"[Night Signal] {sig}")
+        #
+        # elif self.state == "DAY":
+        #     while signal_queue:
+        #         sig = signal_queue.popleft()
+        #         print(f"[Day Signal] {sig}")
 
 
 
@@ -102,7 +109,7 @@ def main():
     # Central signal queue
     signal_queue = deque()
 
-    game = MafiaGame(2)
+    game = MafiaGame(3)
     while True:
         readable, _, _ = select.select(sockets, [], [], 0.05)
 
@@ -145,12 +152,29 @@ def main():
                 msg["player"] = player
 
 
+                # template = {"head": None, "vote": None, "kill": None, "save": None, "setup": None}
                 if game.valid_signal(msg):
+                    print(f"RECEIVED signal {msg} — valid ")
+                    action = msg["action"]
+                    if action == "setup":
+                        game.last_signal[player - 1]["setup"] = True
+                    elif action == "headDown":
+                        game.last_signal[player - 1]["head"] = "down"
+                    elif action == "headUp":
+                        game.last_signal[player - 1]["head"] = "up"
+                    elif action == "targeted":
+                        if player == game.mafia:
+                            game.last_signal[player - 1]["kill"] = msg["target"]
+                        elif player == game.doctor:
+                            game.last_signal[player - 1]["save"] = msg["target"]
+                        else:
+                            game.last_signal[player - 1]["vote"] = msg["target"]
+
                     signal_queue.append(msg)
                 else:
                     print(f"Ignoring signal {msg} — not valid now")
 
-        game.update(signal_queue)
+        game.update()
 
     # Cleanup
     for c in list(game.clients.keys()):
