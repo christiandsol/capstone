@@ -99,6 +99,7 @@ class Pose:
         else:
             print("Error, no role received")
             # Connect to Raspberry Pi and send player ID
+
         pi_socket = self.connect_to_pi()
         self.send_player_id_to_pi(pi_socket, PLAYER_ID, role)
         pi_socket.close()  # Done for now
@@ -195,7 +196,8 @@ class Pose:
 if __name__ == "__main__":
     RECEIVER_IP = "172.16.7.4"
     PORT = 5050
-    PI_IP = "RASPBERRY_PI_IP_HERE"
+    # RASPBERRY PI IP HERE
+    PI_IP = "172.16.8.218"
     PI_PORT = 5051
     pose = Pose(PI_IP, PI_PORT)
     # pose.setup()

@@ -4,10 +4,10 @@ import time
 
 # Raspberry Pi settings
 LAPTOP_IP = "172.16.7.4"  # Replace with the laptop IP
-LAPTOP_PORT = 5051             # Port laptop uses to assign player ID
+LAPTOP_PORT = 5051         # Port laptop uses to assign player ID
 
 SERVER_IP = "172.16.7.4"   # Main server IP
-SERVER_PORT = 5050             # Main server port
+SERVER_PORT = 5050         # Main server port
 
 # Global variable for player ID
 player_id = None
@@ -24,7 +24,7 @@ def receive_player_id():
     if data:
         msg = json.loads(data.decode())
         player_id = msg.get("player_id")
-        print(f"[Pi] Assigned player ID: {player_id}")
+        print("[Pi] Assigned player ID: {}".format(player_id))
 
     s.close()
 
@@ -45,7 +45,7 @@ def send_signal_to_server(action, target=None):
     sock.connect((SERVER_IP, SERVER_PORT))
     sock.sendall(json.dumps(msg).encode())
     sock.close()
-    print(f"[Pi] Sent signal to server: {msg}")
+    print("[Pi] Sent signal to server: {}".format(msg))
 
 def main():
     # Step 1: Receive assigned player ID from laptop
