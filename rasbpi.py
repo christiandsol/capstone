@@ -17,6 +17,7 @@ def receive_player_id():
     global player_id
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(None)
     s.connect((LAPTOP_IP, LAPTOP_PORT))
     print("[Pi] Connected to laptop, waiting for player ID...")
 

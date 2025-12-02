@@ -28,6 +28,7 @@ class Pose:
     def connect_to_pi(self) -> socket.socket:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         print(f"[Pi] Connecting to Raspberry Pi at {self.pi_ip}:{self.pi_port}...")
+        s.settimeout(None)
         s.connect((self.pi_ip, self.pi_port))
         print("[Pi] Connected!")
         return s
