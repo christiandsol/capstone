@@ -25,15 +25,46 @@ class Pose:
                 case "-n": 
                     self.numPeople = int(args[i + 1])
 
+    # def setup(self) -> cv2.VideoCapture:
+    #     """
+    #     sets up the camera, assigns number to every person
+    #     """
+    #     cap = cv2.VideoCapture(1, cv2.CAP_AVFOUNDATION) ## TEST: AVFOUNDATION MIGHT ONLY WORK FOR MACS
+    #     time.sleep(0.5)  # give the camera time to initialize
+    #     if not cap.isOpened():
+    #         print("Cannot open camera")
+    #         exit()
+    #     return cap
     def setup(self) -> cv2.VideoCapture:
         """
-        sets up the camera, assigns number to every person
+        Sets up the camera with an OS-appropriate backend.
         """
-        cap = cv2.VideoCapture(1, cv2.CAP_AVFOUNDATION) ## TEST: AVFOUNDATION MIGHT ONLY WORK FOR MACS
-        time.sleep(0.5)  # give the camera time to initialize
+        os_name = platform.system()
+
+        # Pick best backend based on OS
+        if os_name == "Windows":
+            backend = cv2.CAP_DSHOW
+        elif os_name == "Darwin":   # macOS
+            backend = cv2.CAP_AVFOUNDATION
+        else:
+            backend = cv2.CAP_V4L2  # Linux / other
+
+        print(f"[Camera] Detected OS: {os_name}, using backend: {backend}")
+
+        # Try camera index 0 first with the backend
+        cap = cv2.VideoCapture(0, backend)
+
+        # Fallback if camera didn't open
+        if not cap.isOpened():
+            print("[Camera] Backend failed, retrying default capture...")
+            cap = cv2.VideoCapture(0)
+
+        # Final failure
+        time.sleep(0.5)
         if not cap.isOpened():
             print("Cannot open camera")
             exit()
+
         return cap
 
     def detect_head_position(self, RECEIVER_IP, PORT):
@@ -154,7 +185,7 @@ class Pose:
 
 
 if __name__ == "__main__":
-    RECEIVER_IP = "172.16.7.4"
+    RECEIVER_IP = "172.28.135.180"
     PORT = 5050
     pose = Pose(["-n", "10"])
     pose.setup()

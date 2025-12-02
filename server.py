@@ -21,6 +21,8 @@ class MafiaGame:
         self.expected_signals = {"setup"}
         self.player_cap = players 
         self.last_signal = []  # An array of dictionaries for each player, mapping all signals to the LAST signal received of that type
+        # EACH ONE WILL BE:
+        # {"head"}
         # i.e an array 
 
     def valid_signal(self, signal: Dict[str, Union[str, int]]):
@@ -52,7 +54,6 @@ class MafiaGame:
                 print("All players connected — starting game!")
                 command = listen_for_command()
                 if command == "ready":
-                    print("Rizzy")
                     self.state = "NIGHT"
                     self.expected_signals = {"headUp", "headDown"}
 
