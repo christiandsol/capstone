@@ -4,7 +4,7 @@ import speech_recognition as sr
 
 #voice commands needed: after discussion, "ready to vote" -> gesture recognition
 #
-COMMANDS = ["assign roles", "ready to start","ready to vote", "the sun has set"]
+COMMANDS = ["ready to assign", "ready to start","ready to vote", "night time"]
 WAKE_WORD = "okay mafia"
 
 def listen_for_okay_mafia():
@@ -53,6 +53,6 @@ def listen_for_command():
             return None
 
 if __name__ == "__main__":
-    listen_for_okay_mafia()  #listening for "okay mafia"
+    #listen_for_okay_mafia()  #listening for "okay mafia"
     command = listen_for_command()  # listen for command once awoken
     print("Final result:", command)
