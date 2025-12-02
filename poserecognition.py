@@ -204,10 +204,10 @@ class Pose:
 
 
 if __name__ == "__main__":
-    RECEIVER_IP = "172.16.7.4"
+    RECEIVER_IP = "172.28.135.32"
     PORT = 5050
     # RASPBERRY PI IP HERE
-    PI_IP = "172.16.8.218"
+    PI_IP = "169.254.124.119"
     PI_PORT = 5051
     pose = Pose(PI_IP, PI_PORT)
     # pose.setup()

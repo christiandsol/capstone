@@ -3,10 +3,10 @@ import json
 import time
 
 # Raspberry Pi settings
-LAPTOP_IP = "172.16.7.4"  # IP of the laptop acting as temporary server
+LAPTOP_IP = "172.28.133.60"  # IP of the laptop acting as temporary server
 LAPTOP_PORT = 5051         # Port laptop uses to assign player ID
 
-SERVER_IP = "172.16.7.4"   # Main server IP
+SERVER_IP = "172.28.133.60"   # Main server IP
 SERVER_PORT = 5050         # Main server port
 
 # Global variable for player ID
