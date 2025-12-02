@@ -3,6 +3,8 @@ import time
 import mediapipe as mp
 import platform
 import socket
+import json
+import time
 from typing import Optional
 from typing import List
 from player import Player
@@ -25,13 +27,17 @@ class Pose:
         self.pi_port = pi_port
         self.numPeople = 1
 
-    def connect_to_pi(self) -> socket.socket:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        print(f"[Pi] Connecting to Raspberry Pi at {self.pi_ip}:{self.pi_port}...")
-        s.settimeout(None)
-        s.connect((self.pi_ip, self.pi_port))
-        print("[Pi] Connected!")
-        return s
+    def wait_for_pi_connection(self, port):
+        """Laptop acts as server and waits for Pi to connect"""
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server_socket.bind(("", port))  # Bind to all interfaces
+        server_socket.listen(1)
+        print(f"[Laptop] Waiting for Raspberry Pi to connect on port {port}...")
+        
+        conn, addr = server_socket.accept()
+        print(f"[Laptop] Raspberry Pi connected from {addr}")
+        return conn
 
     def send_player_id_to_pi(self, pi_socket: socket.socket, player_id: int, role: str):
         msg = {"action": "assign_player_id", "player_id": player_id}
@@ -101,10 +107,13 @@ class Pose:
             print("Error, no role received")
             # Connect to Raspberry Pi and send player ID
 
-        pi_socket = self.connect_to_pi()
+        # Wait for Pi to connect
+        pi_socket = self.wait_for_pi_connection(self.pi_port)
         self.send_player_id_to_pi(pi_socket, PLAYER_ID, role)
-        pi_socket.close()  # Done for now
-        
+        pi_socket.close()
+
+        print("[Laptop] Player ID sent to Raspberry Pi, connection closed")
+
         previous_state: Optional[str] = None
         
         with mp_face.FaceMesh(
