@@ -288,21 +288,32 @@ def main():
                 conn, addr = server.accept()
                 conn.setblocking(False)
 
-                if len(game.clients) >= MAX_PLAYERS:
-                    print(f"Rejecting {addr} — server full")
-                    send_json(conn, {"error": "Server full"})
+                msg = receive_json(conn)
+                if msg is None:
+                    print(f"[Connection Failed] No handshake from {addr}")
                     conn.close()
                     continue
+                client_type = msg.get("action")
+                if client_type == "setup" and msg.get("target") == "raspberry_pi":
+                    # this is a raspberry pi socket
+                    pass
+                else:
+                    # Normal socket
+                    if len(game.clients) >= MAX_PLAYERS:
+                        print(f"Rejecting {addr} — server full")
+                        send_json(conn, {"error": "Server full"})
+                        conn.close()
+                        continue
+                    player_id = next_player_id
+                    next_player_id += 1
+                    game.last_signal[player_id - 1]["setup"] = True
 
-                player_id = next_player_id
-                next_player_id += 1
+                    game.clients[conn] = player_id
+                    sockets.append(conn)
 
-                game.clients[conn] = player_id
-                sockets.append(conn)
+                    send_json(conn, player_id, "player_id", None)
 
-                send_json(conn, player_id, "player_id", None)
-
-                print(f"[Connected] Player {player_id} from {addr}")
+                    print(f"[Connected] Player {player_id} from {addr}")
 
             # Existing client sent data
             else:
@@ -324,9 +335,7 @@ def main():
                 if game.valid_signal(msg):
                     print(f"RECEIVED signal {msg} — valid ")
                     action = msg["action"]
-                    if action == "setup":
-                        game.last_signal[player - 1]["setup"] = True
-                    elif action == "headDown":
+                    if action == "headDown":
                         game.last_signal[player - 1]["head"] = "down"
                     elif action == "headUp":
                         game.last_signal[player - 1]["head"] = "up"

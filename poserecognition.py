@@ -2,6 +2,7 @@ import cv2
 import time
 import mediapipe as mp
 import platform
+import socket
 from typing import Optional
 from typing import List
 from player import Player
@@ -19,12 +20,22 @@ mp_drawing = mp.solutions.drawing_utils
 # }
 
 class Pose:
-    def __init__(self, args: List[str]):
-        for i, arg in enumerate(args):
-            print("Arg: ", arg)
-            match arg:
-                case "-n": 
-                    self.numPeople = int(args[i + 1])
+    def __init__(self, pi_ip: str, pi_port: int):
+        self.pi_ip = pi_ip
+        self.pi_port = pi_port
+        self.numPeople = 1
+
+    def connect_to_pi(self) -> socket.socket:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        print(f"[Pi] Connecting to Raspberry Pi at {self.pi_ip}:{self.pi_port}...")
+        s.connect((self.pi_ip, self.pi_port))
+        print("[Pi] Connected!")
+        return s
+
+    def send_player_id_to_pi(self, pi_socket: socket.socket, player_id: int, role: str):
+        msg = {"action": "assign_player_id", "player_id": player_id}
+        pi_socket.send(json.dumps(msg).encode())
+        print(f"[Pi] Sent player ID {player_id} to Raspberry Pi")
 
     def setup(self) -> cv2.VideoCapture:
         """
@@ -87,6 +98,10 @@ class Pose:
             print("YOU ARE CIVILIAN")
         else:
             print("Error, no role received")
+            # Connect to Raspberry Pi and send player ID
+        pi_socket = self.connect_to_pi()
+        self.send_player_id_to_pi(pi_socket, PLAYER_ID, role)
+        pi_socket.close()  # Done for now
         
         previous_state: Optional[str] = None
         
@@ -180,6 +195,8 @@ class Pose:
 if __name__ == "__main__":
     RECEIVER_IP = "172.16.7.4"
     PORT = 5050
-    pose = Pose(["-n", "10"])
+    PI_IP = "RASPBERRY_PI_IP_HERE"
+    PI_PORT = 5051
+    pose = Pose(PI_IP, PI_PORT)
     # pose.setup()
     pose.detect_head_position(RECEIVER_IP, PORT)
