@@ -51,6 +51,7 @@ class BerryIMUInterface:
         try:
             import IMU
             
+            print("[BerryIMU] Attempting to detect IMU...")
             # Detect if BerryIMU is connected
             IMU.detectIMU()
             if IMU.BerryIMUversion == 99:
@@ -58,6 +59,7 @@ class BerryIMUInterface:
                 self.IMU = None
                 return
             
+            print(f"[BerryIMU] Detected version {IMU.BerryIMUversion}, initializing...")
             # Initialize the accelerometer, gyroscope and compass
             IMU.initIMU()
             
@@ -69,8 +71,21 @@ class BerryIMUInterface:
             print("[BerryIMU] Please make sure the IMU.py module is in your Python path.")
             print("[BerryIMU] For now, using dummy values for testing.")
             self.IMU = None
+        except PermissionError as e:
+            print(f"[BerryIMU] ERROR: Permission denied accessing I2C bus: {e}")
+            print("[BerryIMU] Try running with: sudo python3 gesture.py test")
+            print("[BerryIMU] Or add your user to the i2c group: sudo usermod -a -G i2c $USER")
+            self.IMU = None
+        except OSError as e:
+            print(f"[BerryIMU] ERROR: I2C bus access error: {e}")
+            print("[BerryIMU] Check if I2C is enabled: sudo raspi-config -> Interface Options -> I2C -> Enable")
+            print("[BerryIMU] Check hardware connections and power supply.")
+            self.IMU = None
         except Exception as e:
             print(f"[BerryIMU] WARNING: Could not initialize BerryIMU: {e}")
+            print(f"[BerryIMU] Error type: {type(e).__name__}")
+            import traceback
+            traceback.print_exc()
             self.IMU = None
 
     def read_sample(self) -> Tuple[float, float, float, float, float, float]:
@@ -153,49 +168,68 @@ class GestureRecognizer:
         if not samples:
             return None
 
-        # Simple feature: sum accelerations over the sequence.
-        sum_ax = sum(s[0] for s in samples)
-        sum_ay = sum(s[1] for s in samples)
-        sum_az = sum(s[2] for s in samples)
-
-        # You might also want to use gyro, but we'll ignore for now:
-        # sum_gx = sum(s[3] for s in samples)
-        # sum_gy = sum(s[4] for s in samples)
-        # sum_gz = sum(s[5] for s in samples)
+        # Calculate motion by looking at the RANGE (max - min) of each axis
+        # This is better than sum because it captures the actual movement magnitude
+        # and ignores the constant gravity component
+        
+        ax_values = [s[0] for s in samples]
+        ay_values = [s[1] for s in samples]
+        az_values = [s[2] for s in samples]
+        
+        # Calculate range (movement magnitude) for each axis
+        ax_range = max(ax_values) - min(ax_values)
+        ay_range = max(ay_values) - min(ay_values)
+        az_range = max(az_values) - min(az_values)
+        
+        # Calculate average change direction (positive = up/right, negative = down/left)
+        # Use mean to get overall direction of movement
+        mean_ax = sum(ax_values) / len(ax_values)
+        mean_ay = sum(ay_values) / len(ay_values)
+        
+        # Get baseline (first few samples) to detect change from rest
+        baseline_samples = min(5, len(samples) // 4)
+        baseline_ax = sum(ax_values[:baseline_samples]) / baseline_samples
+        baseline_ay = sum(ay_values[:baseline_samples]) / baseline_samples
+        
+        # Calculate change from baseline
+        delta_ax = mean_ax - baseline_ax
+        delta_ay = mean_ay - baseline_ay
 
         # Gesture mapping:
-        # - Digit 1: upward motion (ay positive, dominates)
-        # - Digit 2: rightward motion (ax positive, dominates)
-        # - Digit 3: downward motion (ay negative, dominates)
-        # - Digit 4: leftward motion (ax negative, dominates)
+        # - Digit 1: upward motion (ay increases, becomes less negative or positive)
+        # - Digit 2: rightward motion (ax increases, becomes more positive)
+        # - Digit 3: downward motion (ay decreases, becomes more negative)
+        # - Digit 4: leftward motion (ax decreases, becomes more negative)
 
-        # Basic normalization threshold to ignore tiny movements
-        min_mag = 5.0  # TODO: tune based on real sensor units
+        # Threshold based on your actual values - need significant movement
+        # Your values show movements of 200-1000+ when moving
+        min_movement = 200.0  # Minimum range to consider it a gesture
 
-        # Decide which axis dominates
-        abs_ax, abs_ay, abs_az = abs(sum_ax), abs(sum_ay), abs(sum_az)
-
-        # No strong movement
-        if max(abs_ax, abs_ay, abs_az) < min_mag:
+        # Check if there's significant movement
+        max_range = max(ax_range, ay_range)
+        if max_range < min_movement:
             return None
 
-        # Dominant vertical movement
-        if abs_ay >= abs_ax and abs_ay >= abs_az:
-            if sum_ay > 0:
-                # Upwards gesture -> interpret as "1"
+        # Determine which axis has more movement (horizontal vs vertical)
+        # Use range to determine dominant axis, use delta to determine direction
+        
+        # Dominant vertical movement (up/down)
+        if ay_range >= ax_range:
+            if delta_ay > 100:  # ay increased significantly (upward)
                 return 1
-            else:
-                # Downwards gesture -> interpret as "3"
+            elif delta_ay < -100:  # ay decreased significantly (downward)
                 return 3
-
-        # Dominant horizontal movement
-        if abs_ax >= abs_ay and abs_ax >= abs_az:
-            if sum_ax > 0:
-                # Rightward gesture -> interpret as "2"
-                return 2
             else:
-                # Leftward gesture -> interpret as "4"
+                return None  # Not clear enough
+
+        # Dominant horizontal movement (left/right)
+        else:  # ax_range > ay_range
+            if delta_ax > 100:  # ax increased significantly (rightward)
+                return 2
+            elif delta_ax < -100:  # ax decreased significantly (leftward)
                 return 4
+            else:
+                return None  # Not clear enough
 
         # Fallback: nothing recognized
         return None
