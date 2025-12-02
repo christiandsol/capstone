@@ -28,10 +28,10 @@ class MafiaGame:
 
         # Sockets to monitor
         self.clients : Dict[socket.socket, int]= {}
-        # self.mafia, self.doctor = random.sample(range(1, self.player_cap + 1), 2)
+        self.mafia, self.doctor = random.sample(range(1, self.player_cap + 1), 2)
         # COMMENT THIS OUT LATER
-        self.mafia = 1
-        self.doctor = -1
+        # self.mafia = 1
+        # self.doctor = -1
         self.alive = [True] * self.player_cap
         self.last_killed = -1
         self.last_saved = -1
@@ -94,6 +94,7 @@ class MafiaGame:
         Returns true if everyone has voted
         """
         for i, state in enumerate(self.last_signal):
+            # print(state)
             if state["vote"] == None and self.alive[i]: # if you are alive and haven't voted
                 return False
         return True
@@ -164,6 +165,7 @@ class MafiaGame:
 
 
         if self.state == "MAFIAVOTE":
+
             if not self.check_heads_down([self.mafia]):
                 print("EVERYONE NEEDS TO HAVE THEIR HEAD DOWN EXCEPT MAFIA")
             else:
@@ -226,9 +228,9 @@ class MafiaGame:
 
             print("NOW IT IS THE VOTING STAGE, SAY WHEN YOU ARE READY TO VOTE AND IT WILL BEGIN")
             command = listen_for_command()
-            if command == "vote":
+            if command == "ready to vote":
                 print("YOU MAY NOW SIGNAL WHO TO VOTE")
-                self.expected_signals = {"vote"}
+                self.expected_signals = {"targeted"}
                 self.state = "VOTE"
 
         if self.state == "VOTE":
@@ -269,7 +271,7 @@ def main():
     # Central signal queue
     signal_queue = deque()
 
-    game = MafiaGame(1)
+    game = MafiaGame(2)
     while True:
         readable, _, _ = select.select(sockets, [], [], 0.05)
 
@@ -322,7 +324,7 @@ def main():
             # Existing client sent data
             else:
                 msg = receive_json(sock)
-                # print_dic(msg)
+                print_dic(msg)
 
                 # Disconnect case
                 if msg is None:
@@ -344,11 +346,15 @@ def main():
                     elif action == "headUp":
                         game.last_signal[player - 1]["head"] = "up"
                     elif action == "targeted":
+                        print(f"STATE: {game.state} player: {player}")
                         if player == game.mafia and game.state == "MAFIAVOTE":
-                                game.last_signal[player - 1]["kill"] = msg["target"]
+                            print("1")
+                            game.last_signal[player - 1]["kill"] = msg["target"]
                         elif player == game.doctor and game.state == "DOCTORVOTE":
+                            print("2")
                             game.last_signal[player - 1]["save"] = msg["target"]
                         else:
+                            print("3")
                             game.last_signal[player - 1]["vote"] = msg["target"]
 
                 else:
