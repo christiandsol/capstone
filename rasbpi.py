@@ -66,22 +66,54 @@ def send_signal_to_server(socket, action, target=None):
 def main():
     # Step 1: Connect to laptop to receive player ID
     receive_player_id_from_laptop()
-    socket = connect()
-    # send initial handshake signal
-    send_signal_to_server(socket, "setup", "raspberry_pi")
+    sock = connect()
+
+    # Step 2: Send initial handshake
+    send_signal_to_server(sock, "setup", "raspberry_pi")
 
     try:
-        action = input("Enter action (vote/targeted) or 'q' to quit: ")
+        while True:  # persistent loop to continuously ask for votes/actions
+            action = input("Enter action (vote/targeted) or 'q' to quit: ")
+            if action.lower() == "q":
+                print("[Pi] Quitting...")
+                break
 
-        target = None
-        if action.lower() == "vote" or action.lower() == "targeted":
-            target = int(input("Enter vote target player ID: "))
+            target = None
+            if action.lower() in ["vote", "targeted"]:
+                try:
+                    target = int(input("Enter vote target player ID: "))
+                except ValueError:
+                    print("[Pi] Invalid input, must be an integer.")
+                    continue
 
-        send_signal_to_server(socket, action, target)
+            send_signal_to_server(sock, action, target)
+            time.sleep(0.1)  # optional, gives a tiny delay between sends
 
     except KeyboardInterrupt:
         print("\n[Pi] Exiting...")
-        socket.close()
+
+    finally:
+        sock.close()  # only close once at the very end
+
+# def main():
+#     # Step 1: Connect to laptop to receive player ID
+#     receive_player_id_from_laptop()
+#     socket = connect()
+#     # send initial handshake signal
+#     send_signal_to_server(socket, "setup", "raspberry_pi")
+#
+#     try:
+#         action = input("Enter action (vote/targeted) or 'q' to quit: ")
+#
+#         target = None
+#         if action.lower() == "vote" or action.lower() == "targeted":
+#             target = int(input("Enter vote target player ID: "))
+#
+#         send_signal_to_server(socket, action, target)
+#
+#     except KeyboardInterrupt:
+#         print("\n[Pi] Exiting...")
+#         socket.close()
 
 
 if __name__ == "__main__":

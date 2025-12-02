@@ -38,7 +38,6 @@ class MafiaGame:
 
 
     def valid_signal(self, signal: Dict[str, Union[str, int]]):
-        print(signal)
         """Check if the signal action is allowed in this state"""
         if "action" not in signal:
             return False
@@ -168,7 +167,7 @@ class MafiaGame:
             if not self.check_heads_down([self.mafia]):
                 print("EVERYONE NEEDS TO HAVE THEIR HEAD DOWN EXCEPT MAFIA")
             else:
-                print("MAFIA, signal who to kill")
+                # print("MAFIA, signal who to kill")
                 mafia_target = self.mafia_kill()
                 if mafia_target != -1:
                     self.last_killed = mafia_target
@@ -176,14 +175,19 @@ class MafiaGame:
                     self.alive[mafia_target - 1] = False
                     self.expected_signals = {"headDown", "headUp"}
                     print("MAFIA VOTE READ, MOVING ON")
-                    self.state = "DOCTORHEADSDOWN"
+                    if self.doctor == -1:
+                        print("HERE")
+                        self.expected_signals = {}
+                        self.state = "NARRATE"
+                    else:
+                        self.state = "DOCTORHEADSDOWN"
 
         if self.state == "DOCTORHEADSDOWN":
             if self.check_heads_down([]):
                 print("EVERYONE'S HEAD IS DOWN, HEALER, put head up")
                 self.state = "Mafia up and vote"
                 self.state = "DOCTORVOTE"
-                self.expected_signals = {"headDown", "headUp", "save"}
+                self.expected_signals = {"headDown", "headUp", "targeted"}
 
         if self.state == "DOCTORVOTE":
             if not self.check_heads_down([self.doctor]):
@@ -219,6 +223,7 @@ class MafiaGame:
                 print(f"MAFIA WINS!")
                 self.state = "FINISHED"
                 return
+
             print("NOW IT IS THE VOTING STAGE, SAY WHEN YOU ARE READY TO VOTE AND IT WILL BEGIN")
             command = listen_for_command()
             if command == "vote":
@@ -317,7 +322,7 @@ def main():
             # Existing client sent data
             else:
                 msg = receive_json(sock)
-                print_dic(msg)
+                # print_dic(msg)
 
                 # Disconnect case
                 if msg is None:
@@ -339,15 +344,16 @@ def main():
                     elif action == "headUp":
                         game.last_signal[player - 1]["head"] = "up"
                     elif action == "targeted":
-                        if player == game.mafia:
-                            game.last_signal[player - 1]["kill"] = msg["target"]
-                        elif player == game.doctor:
+                        if player == game.mafia and game.state == "MAFIAVOTE":
+                                game.last_signal[player - 1]["kill"] = msg["target"]
+                        elif player == game.doctor and game.state == "DOCTORVOTE":
                             game.last_signal[player - 1]["save"] = msg["target"]
                         else:
                             game.last_signal[player - 1]["vote"] = msg["target"]
 
                 else:
-                    print(f"Ignoring signal {msg} — not valid now")
+                    pass
+                    # print(f"Ignoring signal {msg} — not valid now")
 
         game.update()
 
