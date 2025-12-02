@@ -65,7 +65,7 @@ def main():
     # Step 2: Send actions to server
     try:
         while True:
-            action = input("Enter action (headUp/headDown/vote) or 'q' to quit: ")
+            action = input("Enter action (vote/targeted) or 'q' to quit: ")
             if action.lower() == "q":
                 break
 
