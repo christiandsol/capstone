@@ -158,7 +158,7 @@ class MafiaGame:
                 print("EVERYONE'S HEAD IS DOWN, MAFIA, put head up")
                 self.state = "Mafia up and vote"
                 self.state = "MAFIAVOTE"
-                self.expected_signals = {"headDown", "headUp", "kill"}
+                self.expected_signals = {"headDown", "headUp", "targeted"}
 
 
         if self.state == "MAFIAVOTE":
@@ -279,7 +279,17 @@ def main():
                     continue
                 client_type = msg.get("action")
                 if client_type == "setup" and msg.get("target") == "raspberry_pi":
+                    print("RECIEVED RASBPI CONNECTION SIGNAL")
                     # this is a raspberry pi socket
+                    player_id = msg.get("player")
+                    if len(game.clients) >= MAX_PLAYERS:
+                        print(f"Rejecting {addr} — server full")
+                        send_json(conn, {"error": "Server full"})
+                        conn.close()
+                        continue
+                    # add player_id to this reference client
+                    game.clients[conn] = player_id
+                    sockets.append(conn)
                     pass
                 else:
                     # Normal socket

@@ -64,6 +64,8 @@ def main():
 
     # Step 2: Send actions to server
     try:
+        # send initial handshake signal
+        send_signal_to_server("setup", "raspberry_pi")
         while True:
             action = input("Enter action (vote/targeted) or 'q' to quit: ")
             if action.lower() == "q":
