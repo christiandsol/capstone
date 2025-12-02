@@ -207,7 +207,7 @@ if __name__ == "__main__":
     RECEIVER_IP = "172.20.10.3"
     PORT = 5050
     # RASPBERRY PI IP HERE
-    PI_IP = "169.254.124.119"
+    PI_IP = "172.20.10.14"
     PI_PORT = 5051
     pose = Pose(PI_IP, PI_PORT)
     # pose.setup()

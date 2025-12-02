@@ -19,7 +19,6 @@ def receive_player_id_from_laptop():
     global player_id, role
 
     while True:
-        print("HERE")
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.connect((LAPTOP_IP, LAPTOP_PORT))
@@ -66,8 +65,10 @@ def send_signal_to_server(socket, action, target=None):
 
 def main():
     # Step 1: Connect to laptop to receive player ID
+    print("HERE")
     receive_player_id_from_laptop()
     sock = connect()
+    print("HERE 2")
 
     # Step 2: Send initial handshake
     send_signal_to_server(sock, "setup", "raspberry_pi")
