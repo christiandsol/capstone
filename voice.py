@@ -1,7 +1,10 @@
 import speech_recognition as sr
 
 # List of commands
-COMMANDS = ["confirm", "ready", "vote", "next"]
+
+#voice commands needed: after discussion, "ready to vote" -> gesture recognition
+#
+COMMANDS = ["assign roles", "ready to vote", "the sun has set"]
 WAKE_WORD = "okay mafia"
 
 def listen_for_okay_mafia():
