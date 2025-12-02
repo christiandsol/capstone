@@ -55,7 +55,6 @@ def send_signal_to_server(socket, action, target=None):
 
     try:
         socket.sendall(json.dumps(msg).encode('utf-8'))
-        socket.close()
         print("[Pi] Sent signal to server: {}".format(msg))
     except Exception as e:
         print("[Pi] Failed to send signal to server:", e)
@@ -84,6 +83,7 @@ def main():
 
     except KeyboardInterrupt:
         print("\n[Pi] Exiting...")
+        socket.close()
 
 
 if __name__ == "__main__":
