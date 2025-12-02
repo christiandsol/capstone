@@ -70,7 +70,7 @@ def main():
                 break
 
             target = None
-            if action.lower() == "vote":
+            if action.lower() == "vote" or action.lower() == "targeted":
                 target = int(input("Enter vote target player ID: "))
 
             send_signal_to_server(action, target)
