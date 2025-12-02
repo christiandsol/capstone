@@ -7,14 +7,6 @@ import voice
 import random
 import sys
 
-night_phase = False
-day_phase = False
-voting_phase = False
-mafias = []
-civilians = []
-civiliansAlive = 8
-mafiaAlive = 2
-
 class Game:
     def __init__(self):
         self.phase = "PRESETUP"
@@ -24,6 +16,7 @@ class Game:
         self.heal = None
         self.last_signal = {}
         self.expected_signals = {"setup"}
+        self.player_cap = 10
 
     def add_player(self, id):
         self.players[id] = Player(id, "", False, False, True)
@@ -33,6 +26,12 @@ class Game:
         self.players[mafiaOne].isMafia = True
         self.players[mafiaTwo].isMafia = True
         self.players[doctorNum].isDoctor = True
+
+    def handle_kill(self, mafia_id, target_id):
+        
+
+    def handle_save(self, doctor_id, target_id):
+
 
     def valid_signal(self, signal: Dict[str, Union[str, int]]):
         """Check if the signal action is allowed in this state"""
@@ -57,15 +56,25 @@ class Game:
                 print("All players connected — starting game!")
                 command = listen_for_command()
                 if command == "ready":
-                    self.state = "NIGHT"
+                    self.phase = "NIGHTMAFIA"
                     self.expected_signals = {"headUp", "headDown"}
 
-        elif self.phase == "NIGHT":
+        elif self.phase == "NIGHTMAFIA":
             while signal_queue:
                 sig = signal_queue.popleft()
-                print(f"[Night Signal] {sig}")
+                print(f"[Night Mafia Signal] {sig}")
+
+        elif self.phase == "NIGHTDOCTOR":
+            while signal_queue:
+                sig = signal_queue.popleft()
+                print(f"[Night Doctor Signal] {sig}")
 
         elif self.phase == "DAY":
             while signal_queue:
                 sig = signal_queue.popleft()
                 print(f"[Day Signal] {sig}")
+
+        elif self.phase == "VOTE":
+            while signal_queue:
+                sig = signal_queue.popleft()
+                print(f"[Vote Signal] {sig}")
