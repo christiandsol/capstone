@@ -4,6 +4,7 @@ import select
 import sys
 import random
 from collections import deque
+import time
 from player import Player
 from util import send_json, receive_json, print_dic
 from voice import listen_for_command
@@ -27,6 +28,9 @@ class MafiaGame:
         # Sockets to monitor
         self.clients : Dict[socket.socket, int]= {}
         self.mafia, self.doctor = random.sample(range(1, self.player_cap + 1), 2)
+        self.alive = [True] * self.player_cap
+        self.last_killed = -1
+        self.last_saved = -1
 
 
     def valid_signal(self, signal: Dict[str, Union[str, int]]):
@@ -48,6 +52,75 @@ class MafiaGame:
                 print(self.players)
         return True
 
+    def check_heads_down(self, nums: List[int]):
+        """
+        @param nums: list of player id's who are ALLOWED to have their heads up at the given moment, pass empty list if no one is allowed
+        """
+        for i, state in enumerate(self.last_signal):
+            if (i + 1) not in nums and state["head"] == "up" and self.alive[i]:
+                return False
+        return True
+
+    def mafia_kill(self):
+        """
+        Checks who the mafia voted for, returns True if signal has been received
+        """
+        last_kill = self.last_signal[self.mafia - 1]["kill"]
+        if last_kill:
+            print(f"Mafia voted to kill {last_kill}")
+            self.last_signal[self.mafia - 1]["kill"] = None
+            return last_kill
+        return -1
+
+    def doctor_save(self):
+        """
+        Checks who the doctor saved, returns True if signal has been received
+        """
+        last_save= self.last_signal[self.doctor- 1]["save"]
+        if last_save:
+            print(f"Doctor saved: {last_save}")
+            self.last_signal[self.doctor- 1]["save"] = None
+            return last_kill
+        return -1
+
+    def everyone_voted(self):
+        """
+        Returns true if everyone has voted
+        """
+        for i, state in enumerate(self.last_signal):
+            if state["vote"] == None and self.alive[i]: # if you are alive and haven't voted
+                return False
+        return True
+    def handle_vote(self):
+        """
+        Check who has the most votes, return that person
+        """
+        votes = [0] * self.player_cap
+        for i, state in enumerate(self.last_signal):
+            votes[state["vote"] - 1] += 1
+
+        max_votes = max(votes)
+        # Find all players who received the max votes
+
+        winners = [i for i, v in enumerate(votes) if v == max_votes]
+
+        # now clear votes for next time
+        for i, state in enumerate(self.last_signal):
+            self.last_signal[i]["vote"] = None
+
+        if len(winners) != 1:
+            return winners
+
+        return [winners[0] + 1]
+    def check_game_finished(self):
+        alive_count = 0
+        for item in self.alive:
+            if item == True:
+                alive_count += 1
+        if alive_count == 2:
+            return True
+        else:
+            return False
 
     def update(self):
         """
@@ -74,10 +147,105 @@ class MafiaGame:
             # Maybe add a little time.sleep for the transitions
             print("EVERYONE PUT THEIR HEADS DOWN")
             self.state = "HEADSDOWN"
+            self.expected_signals = {"headDown", "headUp"}
 
         if self.state == "HEADSDOWN": 
+            if self.check_heads_down([]):
+                print("EVERYONE'S HEAD IS DOWN, MAFIA, put head up")
+                self.state = "Mafia up and vote"
+                self.state = "MAFIAVOTE"
+                self.expected_signals = {"headDown", "headUp", "kill"}
+
+
+        if self.state == "MAFIAVOTE":
+            if not self.check_heads_down([self.mafia]):
+                print("EVERYONE NEEDS TO HAVE THEIR HEAD DOWN EXCEPT MAFIA")
+            else:
+                print("MAFIA, signal who to kill")
+                mafia_target = self.mafia_kill()
+                if mafia_target != -1:
+                    self.last_killed = mafia_target
+                    # mafia chose to kill someone, say that they are killed
+                    self.alive[mafia_target - 1] = False
+                    self.expected_signals = {"headDown", "headUp"}
+                    print("MAFIA VOTE READ, MOVING ON")
+                    self.state = "DOCTORHEADSDOWN"
+
+        if self.state == "DOCTORHEADSDOWN":
+            if self.check_heads_down([]):
+                print("EVERYONE'S HEAD IS DOWN, HEALER, put head up")
+                self.state = "Mafia up and vote"
+                self.state = "DOCTORVOTE"
+                self.expected_signals = {"headDown", "headUp", "save"}
+
+        if self.state == "DOCTORVOTE":
+            if not self.check_heads_down([self.doctor]):
+                print("EVERYONE NEEDS TO HAVE THEIR HEAD DOWN EXCEPT DOCTOR")
+            else:
+                print("DOCTOR, signal who to save")
+                healer_target = self.healer_save()
+                if healer_target != -1:
+                    self.last_saved = healer_target
+                    # doctor chose to save someone, say that they are alive 
+                    self.alive[healer_target - 1] = True
+                    self.expected_signals = {}
+                    print("DOCTOR VOTE READ, MOVING ON")
+                    print("EVERYONE put their heads up")
+                    self.state = "NARRATE"
+
+        if self.state == "NARRATE":
+            print(f"IN THE NIGHT, THE MAFIA CHOSE TO KILL...")
+            time.sleep(2)
+            print(f"PLAYER {self.last_killed}")
+            time.sleep(1)
+            if self.last_killed == self.last_saved:
+                print("BUT...")
+                time.sleep(1)
+                print(f"THEY WERE SAVED BY THE DOCTOR")
+            else:
+                print(f"Unfortunately they were not saved")
+            time.sleep(2)
+
+            if self.check_game_finished():
+                print(f"DRUM ROLL...")
+                time.sleep(2)
+                print(f"MAFIA WINS!")
+                self.state = "FINISHED"
+                return
+            print("NOW IT IS THE VOTING STAGE, SAY WHEN YOU ARE READY TO VOTE AND IT WILL BEGIN")
+            command = listen_for_command()
+            if command == "vote":
+                print("YOU MAY NOW SIGNAL WHO TO VOTE")
+                self.expected_signals = {"vote"}
+                self.state = "VOTE"
+
+        if self.state == "VOTE":
+            if self.everyone_voted():
+                voted_out = self.handle_vote()
+                if len(voted_out) == 1:
+                    print(f"Player: {voted_out} was voted out, sorry")
+                    self.alive[voted_out[0] - 1] = False
+                    print("DRUM ROLL...")
+                    time.sleep(2)
+                    if voted_out[0] == self.mafia:
+                        print("CIVILIANS CORRECTLY VOTED OUT THE MAFIA, CIVILIANS WIN!!!")
+                        self.state = "FINISHED"
+                    else:
+                        print("CIVILIANS FAILED TO VOTE OUT THE MAFIA, GAME CONTINUES, EVERYONE PUT YOUR HEADS DOWN")
+                        self.state = "HEADSDOWN"
+                        self.expected_signals = {"headDown", "headUp"}
+                else:
+                    print(f"There was a tie between {voted_out}, vote again!")
+
+        if self.state == "FINISHED":
             pass
-            # handle_heads_down(signal_queue)
+
+
+
+
+
+
+
 
         # elif self.state == "NIGHT":
         #     while signal_queue:

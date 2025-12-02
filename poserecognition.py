@@ -35,7 +35,7 @@ class Pose:
 
         if os_name == "Windows":
             num = 0
-            backend = cv2.CAP_VFW # CHANGE TO D SOMETHING
+            backend = cv2.CAP_DSHOW 
         else:
             num = 1
             backend = cv2.CAP_AVFOUNDATION
