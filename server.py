@@ -38,7 +38,10 @@ class MafiaGame:
 
 
     def valid_signal(self, signal: Dict[str, Union[str, int]]):
+        print(signal)
         """Check if the signal action is allowed in this state"""
+        if "action" not in signal:
+            return False
         return signal["action"] in self.expected_signals
 
     def add_player(self, player_id: int):
@@ -270,7 +273,9 @@ def main():
             # A new client is connecting
             if sock is server:
                 conn, addr = server.accept()
+                # conn.setblocking(True)
                 conn.setblocking(False)
+
 
                 msg = receive_json(conn)
                 if msg is None:
@@ -316,10 +321,10 @@ def main():
 
                 # Disconnect case
                 if msg is None:
-                    print(f"[Disconnected] Player {game.clients[sock]}")
-                    sockets.remove(sock)
-                    del game.clients[sock]
-                    sock.close()
+                    # print(f"[Disconnected] Player {game.clients[sock]}")
+                    # sockets.remove(sock)
+                    # del game.clients[sock]
+                    # sock.close()
                     continue
                 player = game.clients[sock]
                 msg["player"] = player
@@ -341,7 +346,6 @@ def main():
                         else:
                             game.last_signal[player - 1]["vote"] = msg["target"]
 
-                    signal_queue.append(msg)
                 else:
                     print(f"Ignoring signal {msg} — not valid now")
 

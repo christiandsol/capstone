@@ -64,22 +64,17 @@ def main():
     # Step 1: Connect to laptop to receive player ID
     receive_player_id_from_laptop()
     socket = connect()
+    # send initial handshake signal
+    send_signal_to_server(socket, "setup", "raspberry_pi")
 
-    # Step 2: Send actions to server
     try:
-        # send initial handshake signal
-        send_signal_to_server(socket, "setup", "raspberry_pi")
-        while True:
-            action = input("Enter action (vote/targeted) or 'q' to quit: ")
-            if action.lower() == "q":
-                break
+        action = input("Enter action (vote/targeted) or 'q' to quit: ")
 
-            target = None
-            if action.lower() == "vote" or action.lower() == "targeted":
-                target = int(input("Enter vote target player ID: "))
+        target = None
+        if action.lower() == "vote" or action.lower() == "targeted":
+            target = int(input("Enter vote target player ID: "))
 
-            send_signal_to_server(socket, action, target)
-            time.sleep(0.1)
+        send_signal_to_server(socket, action, target)
 
     except KeyboardInterrupt:
         print("\n[Pi] Exiting...")
