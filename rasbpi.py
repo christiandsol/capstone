@@ -3,10 +3,10 @@ import json
 import time
 
 # Raspberry Pi settings
-LAPTOP_IP = "172.28.133.60"  # IP of the laptop acting as temporary server
+LAPTOP_IP = "172.20.10.3"  # IP of the laptop acting as temporary server
 LAPTOP_PORT = 5051         # Port laptop uses to assign player ID
 
-SERVER_IP = "172.28.133.60"   # Main server IP
+SERVER_IP = "172.20.10.3"   # Main server IP
 SERVER_PORT = 5050         # Main server port
 
 # Global variable for player ID
@@ -19,6 +19,7 @@ def receive_player_id_from_laptop():
     global player_id, role
 
     while True:
+        print("HERE")
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.connect((LAPTOP_IP, LAPTOP_PORT))
@@ -33,7 +34,7 @@ def receive_player_id_from_laptop():
                 print("[Pi] Assigned role: {}".format(role))
             s.close()
             break
-        except ConnectionRefusedError:
+        except Exception as e:
             print("[Pi] Laptop not ready yet, retrying in 1s...")
             time.sleep(1)
 

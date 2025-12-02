@@ -382,9 +382,9 @@ if __name__ == "__main__":
     import sys
     
     # Check if user wants to run in test mode (just print IMU values)
-    if len(sys.argv) > 1 and sys.argv[1] == "test":
-        test_imu_readings()
-        sys.exit(0)
+    # if len(sys.argv) > 1 and sys.argv[1] == "test":
+    #     test_imu_readings()
+    #     sys.exit(0)
     
     # TODO: Set these to your actual server IP / port and player ID.
     SERVER_IP = "172.16.7.4"  # Example: laptop/server IP

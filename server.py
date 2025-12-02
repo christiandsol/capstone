@@ -28,10 +28,10 @@ class MafiaGame:
 
         # Sockets to monitor
         self.clients : Dict[socket.socket, int]= {}
-        self.mafia, self.doctor = random.sample(range(1, self.player_cap + 1), 2)
+        # self.mafia, self.doctor = random.sample(range(1, self.player_cap + 1), 2)
         # COMMENT THIS OUT LATER
-        # self.mafia = 1
-        # self.doctor = -1
+        self.mafia = 1
+        self.doctor = -1
         self.alive = [True] * self.player_cap
         self.last_killed = -1
         self.last_saved = -1
@@ -260,6 +260,7 @@ def main():
     server.bind((HOST, PORT))
     server.listen()
     server.setblocking(False)
+    # server.setblocking(True)
 
     print(f"Listening on port {PORT}...")
 
@@ -271,7 +272,7 @@ def main():
     # Central signal queue
     signal_queue = deque()
 
-    game = MafiaGame(2)
+    game = MafiaGame(1)
     while True:
         readable, _, _ = select.select(sockets, [], [], 0.05)
 
