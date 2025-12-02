@@ -35,7 +35,12 @@ def receive_player_id_from_laptop():
             time.sleep(1)
 
 
-def send_signal_to_server(action, target=None):
+def connect():
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((SERVER_IP, SERVER_PORT))
+        return sock
+
+def send_signal_to_server(socket, action, target=None):
     """Send a signal to the main server using the global player_id"""
     global player_id
     if player_id is None:
@@ -49,10 +54,8 @@ def send_signal_to_server(action, target=None):
     }
 
     try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((SERVER_IP, SERVER_PORT))
-        sock.sendall(json.dumps(msg).encode())
-        sock.close()
+        socket.sendall(json.dumps(msg).encode())
+        socket.close()
         print("[Pi] Sent signal to server: {}".format(msg))
     except Exception as e:
         print("[Pi] Failed to send signal to server:", e)
@@ -61,11 +64,12 @@ def send_signal_to_server(action, target=None):
 def main():
     # Step 1: Connect to laptop to receive player ID
     receive_player_id_from_laptop()
+    socket = connect()
 
     # Step 2: Send actions to server
     try:
         # send initial handshake signal
-        send_signal_to_server("setup", "raspberry_pi")
+        send_signal_to_server(socket, "setup", "raspberry_pi")
         while True:
             action = input("Enter action (vote/targeted) or 'q' to quit: ")
             if action.lower() == "q":
@@ -75,7 +79,7 @@ def main():
             if action.lower() == "vote" or action.lower() == "targeted":
                 target = int(input("Enter vote target player ID: "))
 
-            send_signal_to_server(action, target)
+            send_signal_to_server(socket, action, target)
             time.sleep(0.1)
 
     except KeyboardInterrupt:
