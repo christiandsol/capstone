@@ -23,6 +23,7 @@ def client_connect(RECEIVER_IP, PORT):
     If you are the client, this connects you to the server
     """
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client.settimeout(10)
     client.connect((RECEIVER_IP, PORT))
     return client
 
