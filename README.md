@@ -1,6 +1,10 @@
 
 # Manual
 
+# Finish Lab 3
+# Set up Conda Environment
+# 
+
 ## Arguments: 
 - n <num>: number of people[Required]
 - m <num>: number of mafias[Optional]
