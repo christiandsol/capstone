@@ -11,11 +11,12 @@ SERVER_PORT = 5050         # Main server port
 
 # Global variable for player ID
 player_id = None
+role = None
 
 
 def receive_player_id_from_laptop():
     """Connect to the laptop (acting as server) to receive assigned player ID"""
-    global player_id
+    global player_id, role
 
     while True:
         try:
@@ -27,7 +28,9 @@ def receive_player_id_from_laptop():
             if data:
                 msg = json.loads(data.decode())
                 player_id = msg.get("player_id")
+                role = msg.get("role")
                 print("[Pi] Assigned player ID: {}".format(player_id))
+                print("[Pi] Assigned role: {}".format(role))
             s.close()
             break
         except ConnectionRefusedError:

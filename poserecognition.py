@@ -40,7 +40,7 @@ class Pose:
         return conn
 
     def send_player_id_to_pi(self, pi_socket: socket.socket, player_id: int, role: str):
-        msg = {"action": "assign_player_id", "player_id": player_id}
+        msg = {"action": "assign_player_id", "player_id": player_id, "role": role}
         pi_socket.send(json.dumps(msg).encode())
         print(f"[Pi] Sent player ID {player_id} to Raspberry Pi")
 
