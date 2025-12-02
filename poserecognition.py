@@ -1,6 +1,7 @@
 import cv2
 import time
 import mediapipe as mp
+import platform
 from typing import Optional
 from typing import List
 from player import Player
@@ -25,47 +26,29 @@ class Pose:
                 case "-n": 
                     self.numPeople = int(args[i + 1])
 
-    # def setup(self) -> cv2.VideoCapture:
-    #     """
-    #     sets up the camera, assigns number to every person
-    #     """
-    #     cap = cv2.VideoCapture(1, cv2.CAP_AVFOUNDATION) ## TEST: AVFOUNDATION MIGHT ONLY WORK FOR MACS
-    #     time.sleep(0.5)  # give the camera time to initialize
-    #     if not cap.isOpened():
-    #         print("Cannot open camera")
-    #         exit()
-    #     return cap
     def setup(self) -> cv2.VideoCapture:
         """
-        Sets up the camera with an OS-appropriate backend.
+        sets up the camera, assigns number to every person
         """
+
         os_name = platform.system()
 
-        # Pick best backend based on OS
         if os_name == "Windows":
+            num = 0
             backend = cv2.CAP_DSHOW
-        elif os_name == "Darwin":   # macOS
-            backend = cv2.CAP_AVFOUNDATION
         else:
-            backend = cv2.CAP_V4L2  # Linux / other
+            num = 1
+            backend = cv2.CAP_AVFOUNDATION
 
         print(f"[Camera] Detected OS: {os_name}, using backend: {backend}")
 
-        # Try camera index 0 first with the backend
-        cap = cv2.VideoCapture(0, backend)
-
-        # Fallback if camera didn't open
-        if not cap.isOpened():
-            print("[Camera] Backend failed, retrying default capture...")
-            cap = cv2.VideoCapture(0)
-
-        # Final failure
-        time.sleep(0.5)
+        cap = cv2.VideoCapture(num, cv2.CAP_AVFOUNDATION) ## TEST: AVFOUNDATION MIGHT ONLY WORK FOR MACS
+        time.sleep(0.5)  # give the camera time to initialize
         if not cap.isOpened():
             print("Cannot open camera")
             exit()
-
         return cap
+
 
     def detect_head_position(self, RECEIVER_IP, PORT):
         """
