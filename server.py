@@ -10,6 +10,7 @@ from util import send_json, receive_json, print_dic
 from voice import listen_for_command
 from player import Player
 from typing import Dict, Union, List, Deque
+from mafia import Game
 
 # Socket setup
 HOST = "0.0.0.0"
@@ -80,7 +81,7 @@ class MafiaGame:
         if last_save:
             print(f"Doctor saved: {last_save}")
             self.last_signal[self.doctor- 1]["save"] = None
-            return last_kill
+            return last_save
         return -1
 
     def everyone_voted(self):
@@ -183,7 +184,7 @@ class MafiaGame:
                 print("EVERYONE NEEDS TO HAVE THEIR HEAD DOWN EXCEPT DOCTOR")
             else:
                 print("DOCTOR, signal who to save")
-                healer_target = self.healer_save()
+                healer_target = self.doctor_save()
                 if healer_target != -1:
                     self.last_saved = healer_target
                     # doctor chose to save someone, say that they are alive 
@@ -239,26 +240,6 @@ class MafiaGame:
 
         if self.state == "FINISHED":
             pass
-
-
-
-
-
-
-
-
-        # elif self.state == "NIGHT":
-        #     while signal_queue:
-        #         sig = signal_queue.popleft()
-        #         print(f"[Night Signal] {sig}")
-        #
-        # elif self.state == "DAY":
-        #     while signal_queue:
-        #         sig = signal_queue.popleft()
-        #         print(f"[Day Signal] {sig}")
-
-
-
 
 def main():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
