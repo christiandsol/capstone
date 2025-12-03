@@ -3,10 +3,41 @@ import time
 # List of commands
 
 #voice commands needed: after discussion, "ready to vote" -> gesture recognition
-#
-COMMANDS = ["assign players", "ready to start","ready to vote", "night time"]
+#COMMANDS = ["assign players", "ready to start","ready to vote", "night time"]
+
+COMMAND_ALTERNATIVES ={
+     #ready to start
+     "ready to start": 1,
+     "ready start": 1,
+     "start game": 1,
+     "I need to start": 1,
+     "start": 1,
+
+     #assign player roles
+     "assign players": 2,
+     "assign play": 2,
+     "asign players":2,
+     "find players": 2,
+     "sign players": 2,
+     "assigned players": 2,
+      
+      #ready to vote
+      "ready to vote": 3,
+      "navigate to vote": 3,  
+      "ready to Vogt": 3,
+
+      #night time
+      "night time": 4,
+      "night times": 4,
+      "nite times": 4,
+      "nite time": 4 
+      }
+
+
+
+
 WAKE_WORD = "okay mafia"
-WAKE_WORD_ALTERNATIVES = ["okay mafia", "ok mafia", "okay maffia", "okay maphy", "ok maphy", "okay maf", "okay maff", "open maff", "open maf", "open mafia", "mafia", "maffia"]
+WAKE_WORD_ALTERNATIVES = ["okay mafia", "ok mafia", "okay maffia", "okay maphy", "ok maphy", "okay maf", "okay maff", "open maff", "open maf", "open mafia"]
 
 def listen_for_okay_mafia():
     r = sr.Recognizer()
@@ -102,17 +133,10 @@ def listen_for_command():
                 text = alternative['transcript'].lower()
                 
                 # Check if any command matches this alternative
-                for cmd in COMMANDS:
-                    if cmd in text:
-                        print("Command recognized:", cmd)
-                        if cmd=="ready to start":
-                            return 1
-                        elif cmd=="assign players":
-                            return 2
-                        elif cmd=="ready to vote":
-                            return 3
-                        elif cmd=="night time":
-                            return 4
+                for cmd_phrase, cmd_code in COMMAND_ALTERNATIVES.items():
+                    if cmd_phrase in text:
+                        print(f" Command recognized: '{cmd_phrase}' → Code: {cmd_code}")
+                        return cmd_code
                       
                    
             return None
@@ -124,6 +148,6 @@ def listen_for_command():
             return None
    
 if __name__ == "__main__":
-    listen_for_okay_mafia()  #listening for "okay mafia"
+    #listen_for_okay_mafia()  #listening for "okay mafia"
     command = listen_for_command()  # listen for command once awoken
     print("Final result:", command)
