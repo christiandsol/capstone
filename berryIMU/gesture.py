@@ -160,70 +160,74 @@ class GestureRecognizer:
         if not samples:
             return None
 
-        # Calculate motion by looking at the RANGE (max - min) of each axis
-        # This is better than sum because it captures the actual movement magnitude
-        # and ignores the constant gravity component
+        # SIMPLIFIED APPROACH: Use peak detection instead of mean-based analysis
+        # This works better for gestures with multiple direction changes
         
         ax_values = [s[0] for s in samples]
         ay_values = [s[1] for s in samples]
-        az_values = [s[2] for s in samples]
         
-        # Calculate range (movement magnitude) for each axis
-        ax_range = max(ax_values) - min(ax_values)
-        ay_range = max(ay_values) - min(ay_values)
-        az_range = max(az_values) - min(az_values)
+        # Get baseline (average of first 3 samples - rest position)
+        baseline_ax = sum(ax_values[:3]) / 3
+        baseline_ay = sum(ay_values[:3]) / 3
         
-        # Calculate average change direction (positive = up/right, negative = down/left)
-        # Use mean to get overall direction of movement
-        mean_ax = sum(ax_values) / len(ax_values)
-        mean_ay = sum(ay_values) / len(ay_values)
+        # Find peak values (max and min) for each axis
+        max_ax = max(ax_values)
+        min_ax = min(ax_values)
+        max_ay = max(ay_values)
+        min_ay = min(ay_values)
         
-        # Get baseline (first few samples) to detect change from rest
-        baseline_samples = min(5, len(samples) // 4)
-        baseline_ax = sum(ax_values[:baseline_samples]) / baseline_samples
-        baseline_ay = sum(ay_values[:baseline_samples]) / baseline_samples
+        # Calculate how far peaks are from baseline (absolute distance)
+        # This tells us which direction had the strongest movement
+        ax_positive_peak = abs(max_ax - baseline_ax)  # Rightward movement
+        ax_negative_peak = abs(min_ax - baseline_ax)  # Leftward movement
+        ay_positive_peak = abs(max_ay - baseline_ay)  # Upward movement (less negative)
+        ay_negative_peak = abs(min_ay - baseline_ay)  # Downward movement (more negative)
         
-        # Calculate change from baseline
-        delta_ax = mean_ax - baseline_ax
-        delta_ay = mean_ay - baseline_ay
-
-        # Gesture mapping:
-        # - Digit 1: upward motion (ay increases, becomes less negative or positive)
-        # - Digit 2: rightward motion (ax increases, becomes more positive)
-        # - Digit 3: downward motion (ay decreases, becomes more negative)
-        # - Digit 4: leftward motion (ax decreases, becomes more negative)
-
-        # Threshold based on your actual values - need significant movement
-        # Your values show movements of 200-1000+ when moving
-        min_movement = 200.0  # Minimum range to consider it a gesture
-
-        # Check if there's significant movement
+        # Calculate total range for each axis (to determine if movement is significant)
+        ax_range = max_ax - min_ax
+        ay_range = max_ay - min_ay
+        
+        # Simple threshold - need at least 300 units of movement
+        min_movement = 300.0
         max_range = max(ax_range, ay_range)
+        
         if max_range < min_movement:
             return None
-
-        # Determine which axis has more movement (horizontal vs vertical)
-        # Use range to determine dominant axis, use delta to determine direction
         
-        # Dominant vertical movement (up/down)
-        if ay_range >= ax_range:
-            if delta_ay > 100:  # ay increased significantly (upward)
-                return 1
-            elif delta_ay < -100:  # ay decreased significantly (downward)
-                return 3
-            else:
-                return None  # Not clear enough
-
-        # Dominant horizontal movement (left/right)
-        else:  # ax_range > ay_range
-            if delta_ax > 100:  # ax increased significantly (rightward)
-                return 2
-            elif delta_ax < -100:  # ax decreased significantly (leftward)
-                return 4
-            else:
-                return None  # Not clear enough
-
-        # Fallback: nothing recognized
+        # Determine dominant axis and direction using peak distances
+        # Gesture mapping:
+        # - Digit 1: upward (ay positive peak dominates)
+        # - Digit 2: rightward (ax positive peak dominates)
+        # - Digit 3: downward (ay negative peak dominates)
+        # - Digit 4: leftward (ax negative peak dominates)
+        
+        # Find the strongest peak in any direction
+        peaks = {
+            'up': ay_positive_peak,
+            'down': ay_negative_peak,
+            'right': ax_positive_peak,
+            'left': ax_negative_peak
+        }
+        
+        strongest_direction = max(peaks, key=peaks.get)
+        strongest_magnitude = peaks[strongest_direction]
+        
+        # Need a clear dominant direction (at least 200 units stronger than others)
+        # This prevents ambiguous gestures
+        second_strongest = sorted(peaks.values(), reverse=True)[1]
+        if strongest_magnitude - second_strongest < 200:
+            return None  # Too ambiguous
+        
+        # Map direction to digit
+        if strongest_direction == 'up':
+            return 1
+        elif strongest_direction == 'right':
+            return 2
+        elif strongest_direction == 'down':
+            return 3
+        elif strongest_direction == 'left':
+            return 4
+        
         return None
 
 
@@ -363,7 +367,7 @@ if __name__ == "__main__":
         sys.exit(0)
     
     # TODO: Set these to your actual server IP / port and player ID.
-    SERVER_IP = "172.16.7.4"  # Example: laptop/server IP
+    SERVER_IP = "10.65.171.192"  # Example: laptop/server IP
     SERVER_PORT = 5050
 
     # For now, hard-code player ID or pass via command line argument.
