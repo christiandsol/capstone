@@ -28,10 +28,10 @@ class MafiaGame:
 
         # Sockets to monitor
         self.clients : Dict[socket.socket, int]= {}
-        # self.mafia, self.doctor = random.sample(range(1, self.player_cap + 1), 2)
+        self.mafia, self.doctor = random.sample(range(1, self.player_cap + 1), 2)
         # COMMENT THIS OUT LATER
-        self.mafia = 1
-        self.doctor = -1
+        # self.mafia = 1
+        # self.doctor = -1
         self.alive = [True] * self.player_cap
         self.last_killed = -1
         self.last_saved = -1
@@ -138,10 +138,10 @@ class MafiaGame:
         if self.state == "LOBBY":
             if self.check_everyone_in_game():
                 print("All players connected — starting game!")
-                # command = listen_for_command()
-                # if command == "ready":
-                self.state = "ASSIGN"
-                self.expected_signals = {}
+                command = listen_for_command()
+                if command == 2:
+                    self.state = "ASSIGN"
+                    self.expected_signals = {}
 
         if self.state == "ASSIGN":
             for socket, player_id in self.clients.items():
@@ -228,7 +228,8 @@ class MafiaGame:
 
             print("NOW IT IS THE VOTING STAGE, SAY WHEN YOU ARE READY TO VOTE AND IT WILL BEGIN")
             command = listen_for_command()
-            if command == "ready to vote":
+            print(f"HEARD COMMAND{command}")
+            if command == 3:
                 print("YOU MAY NOW SIGNAL WHO TO VOTE")
                 self.expected_signals = {"targeted"}
                 self.state = "VOTE"
@@ -259,7 +260,7 @@ def main():
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server.bind((HOST, PORT))
     server.listen()
-    server.setblocking(False)
+    # server.setblocking(False)
     # server.setblocking(True)
 
     print(f"Listening on port {PORT}...")
@@ -272,7 +273,7 @@ def main():
     # Central signal queue
     signal_queue = deque()
 
-    game = MafiaGame(1)
+    game = MafiaGame(4)
     while True:
         readable, _, _ = select.select(sockets, [], [], 0.05)
 
@@ -282,7 +283,7 @@ def main():
             if sock is server:
                 conn, addr = server.accept()
                 # conn.setblocking(True)
-                conn.setblocking(False)
+                # conn.setblocking(False)
 
 
                 msg = receive_json(conn)
