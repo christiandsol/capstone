@@ -1,12 +1,18 @@
 import socket
 import json
 import time
+import sys
+import os
+
+# Add berryIMU directory to path to import gesture recognition
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'berryIMU'))
+from gesture import BerryIMUInterface, GestureRecognizer
 
 # Raspberry Pi settings
-LAPTOP_IP = "172.20.10.3"  # IP of the laptop acting as temporary server
+LAPTOP_IP = "10.65.171.234"  # IP of the laptop acting as temporary server,  changed this for pose to per user
 LAPTOP_PORT = 5051         # Port laptop uses to assign player ID
 
-SERVER_IP = "172.20.10.3"   # Main server IP
+SERVER_IP = "10.65.171.192"   # Main server IP
 SERVER_PORT = 5050         # Main server port
 
 # Global variable for player ID
@@ -73,21 +79,51 @@ def main():
     # Step 2: Send initial handshake
     send_signal_to_server(sock, "setup", "raspberry_pi")
 
+    # Initialize gesture recognition
+    imu = BerryIMUInterface(debug=False)
+    recognizer = GestureRecognizer()
+
     try:
         while True:  # persistent loop to continuously ask for votes/actions
-            action = input("Enter action (vote/targeted) or 'q' to quit: ")
-            if action.lower() == "q":
+            print("\n[Pi] Ready to record gesture. Move the BerryIMU to vote (1-4)...")
+            print("[Pi] Press Enter to start recording, or 'q' to quit: ", end='')
+            cmd = input().strip().lower()
+            
+            if cmd == "q":
                 print("[Pi] Quitting...")
                 break
 
-            target = None
-            if action.lower() in ["vote", "targeted"]:
-                try:
-                    target = int(input("Enter vote target player ID: "))
-                except ValueError:
-                    print("[Pi] Invalid input, must be an integer.")
-                    continue
-
+            # Record gesture sequence (1 second)
+            print("[Pi] Recording gesture... move the BerryIMU now.")
+            samples = []
+            duration_s = 1.0
+            sample_rate_hz = 50.0
+            dt = 1.0 / sample_rate_hz
+            num_samples = int(duration_s * sample_rate_hz)
+            
+            for i in range(num_samples):
+                sample = imu.read_sample()
+                samples.append(sample)
+                time.sleep(dt)
+            
+            print("[Pi] Recording complete, recognizing...")
+            
+            # Classify the gesture
+            digit = recognizer.classify(samples)
+            
+            if digit is None:
+                print("[Pi] Could not recognize gesture. Try again with a clearer movement.")
+                continue
+            
+            if digit not in (1, 2, 3, 4):
+                print(f"[Pi] Recognized digit {digit}, but only 1-4 are valid. Ignoring.")
+                continue
+            
+            # Set action and target based on gesture recognition
+            action = "targeted"
+            target = digit
+            
+            print(f"[Pi] Recognized gesture as digit {digit} (voting for player {digit})")
             send_signal_to_server(sock, action, target)
             time.sleep(0.1)  # optional, gives a tiny delay between sends
 
