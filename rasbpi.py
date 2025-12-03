@@ -119,11 +119,19 @@ def main():
                 print(f"[Pi] Recognized digit {digit}, but only 1-4 are valid. Ignoring.")
                 continue
             
+            # Ask for confirmation before sending vote
+            print(f"[Pi] Recognized gesture as digit {digit} (vote for player {digit})")
+            confirm = input(f"[Pi] Confirm vote for player {digit}? (y/n): ").strip().lower()
+            
+            if confirm != "y":
+                print("[Pi] Vote cancelled. Recording new gesture...")
+                continue  # Go back to the start of the loop to record again
+            
             # Set action and target based on gesture recognition
             action = "targeted"
             target = digit
             
-            print(f"[Pi] Recognized gesture as digit {digit} (voting for player {digit})")
+            print(f"[Pi] Sending vote for player {digit}...")
             send_signal_to_server(sock, action, target)
             time.sleep(0.1)  # optional, gives a tiny delay between sends
 
