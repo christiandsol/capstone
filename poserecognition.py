@@ -60,7 +60,7 @@ class Pose:
 
         print(f"[Camera] Detected OS: {os_name}, using backend: {backend}")
 
-        cap = cv2.VideoCapture(num, backend) ## TEST: AVFOUNDATION MIGHT ONLY WORK FOR MACS
+        cap = cv2.VideoCapture(1, backend) ## TEST: AVFOUNDATION MIGHT ONLY WORK FOR MACS
         time.sleep(1)  # give the camera time to initialize
         if not cap.isOpened():
             print("Cannot open camera")
@@ -204,10 +204,10 @@ class Pose:
 
 
 if __name__ == "__main__":
-    RECEIVER_IP = "172.28.135.32"
+    RECEIVER_IP = "172.20.10.3"
     PORT = 5050
     # RASPBERRY PI IP HERE
-    PI_IP = "169.254.124.119"
+    PI_IP = "172.20.10.2"
     PI_PORT = 5051
     pose = Pose(PI_IP, PI_PORT)
     # pose.setup()

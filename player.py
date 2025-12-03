@@ -5,3 +5,10 @@ class Player:
         self.isMafia = isMafia
         self.isDoctor = isDoctor
         self.isAlive = isAlive
+        self.last_signal = {
+            "head": None,
+            "vote": None,
+            "kill": None,
+            "save": None,
+            "setup": False
+        }
