@@ -105,7 +105,16 @@ def listen_for_command():
                 for cmd in COMMANDS:
                     if cmd in text:
                         print("Command recognized:", cmd)
-                        return cmd
+                        if cmd=="ready to start":
+                            return 1
+                        elif cmd=="assign players":
+                            return 2
+                        elif cmd=="ready to vote":
+                            return 3
+                        elif cmd=="night time":
+                            return 4
+                      
+                   
             return None
         except sr.UnknownValueError:
             print("Could not understand audio.")
