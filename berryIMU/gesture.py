@@ -51,7 +51,6 @@ class BerryIMUInterface:
         try:
             import IMU
             
-            print("[BerryIMU] Attempting to detect IMU...")
             # Detect if BerryIMU is connected
             IMU.detectIMU()
             if IMU.BerryIMUversion == 99:
@@ -59,12 +58,10 @@ class BerryIMUInterface:
                 self.IMU = None
                 return
             
-            print(f"[BerryIMU] Detected version {IMU.BerryIMUversion}, initializing...")
             # Initialize the accelerometer, gyroscope and compass
             IMU.initIMU()
             
             self.IMU = IMU
-            print(f"[BerryIMU] Initialized successfully (version {IMU.BerryIMUversion})")
             
         except ImportError as e:
             print(f"[BerryIMU] WARNING: Could not import IMU library: {e}")
@@ -126,11 +123,6 @@ class BerryIMUInterface:
             return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
         
         sample = (ax, ay, az, gx, gy, gz)
-        
-        if self.debug:
-            print(f"[IMU] ax={ax:8.2f}, ay={ay:8.2f}, az={az:8.2f}, "
-                  f"gx={gx:8.2f}, gy={gy:8.2f}, gz={gz:8.2f}")
-        
         return sample
 
 
@@ -271,16 +263,9 @@ class GestureVotingClient:
         dt = 1.0 / sample_rate_hz
         num_samples = int(duration_s * sample_rate_hz)
 
-        print(f"[Recording] Collecting {num_samples} samples over {duration_s}s...")
-        
         for i in range(num_samples):
             sample = self.imu.read_sample()
             samples.append(sample)
-            
-            if debug and i % 10 == 0:  # Print every 10th sample to avoid spam
-                print(f"  Sample {i}: ax={sample[0]:.2f}, ay={sample[1]:.2f}, az={sample[2]:.2f}, "
-                      f"gx={sample[3]:.2f}, gy={sample[4]:.2f}, gz={sample[5]:.2f}")
-            
             time.sleep(dt)
 
         return samples
@@ -326,17 +311,8 @@ class GestureVotingClient:
                 break
 
             print("Recording gesture... move the BerryIMU now.")
-            # First time: enable debug to see raw values
-            debug_mode = input("Enable debug mode to see raw IMU values? (y/n, default=n): ").strip().lower() == "y"
-            samples = self._record_gesture_sequence(duration_s=1.0, sample_rate_hz=50.0, debug=debug_mode)
-            print("Recording complete, recognizing...")
-            
-            # Print summary of collected data
-            if samples:
-                avg_ax = sum(s[0] for s in samples) / len(samples)
-                avg_ay = sum(s[1] for s in samples) / len(samples)
-                avg_az = sum(s[2] for s in samples) / len(samples)
-                print(f"[Summary] Average accel: ax={avg_ax:.2f}, ay={avg_ay:.2f}, az={avg_az:.2f}")
+            samples = self._record_gesture_sequence(duration_s=1.0, sample_rate_hz=50.0, debug=False)
+            print("Recognizing...")
 
             digit = self.recognizer.classify(samples)
             if digit is None:
@@ -382,9 +358,9 @@ if __name__ == "__main__":
     import sys
     
     # Check if user wants to run in test mode (just print IMU values)
-    # if len(sys.argv) > 1 and sys.argv[1] == "test":
-    #     test_imu_readings()
-    #     sys.exit(0)
+    if len(sys.argv) > 1 and sys.argv[1] == "test":
+        test_imu_readings()
+        sys.exit(0)
     
     # TODO: Set these to your actual server IP / port and player ID.
     SERVER_IP = "172.16.7.4"  # Example: laptop/server IP
