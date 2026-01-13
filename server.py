@@ -245,12 +245,18 @@ class MafiaGame:
                     if voted_out[0] == self.mafia:
                         print("CIVILIANS CORRECTLY VOTED OUT THE MAFIA, CIVILIANS WIN!!!")
                         self.state = "FINISHED"
+                    elif self.check_game_finished():
+                        print("MAFIA WINS")
+                        self.state = "FINISHED"
                     else:
                         print("CIVILIANS FAILED TO VOTE OUT THE MAFIA, GAME CONTINUES, EVERYONE PUT YOUR HEADS DOWN")
                         self.state = "HEADSDOWN"
                         self.expected_signals = {"headDown", "headUp"}
                 else:
-                    print(f"There was a tie between {voted_out}, vote again!")
+                    print(f"There was a tie between {voted_out}, moving on!")
+                    print("CIVILIANS FAILED TO VOTE OUT THE MAFIA, GAME CONTINUES, EVERYONE PUT YOUR HEADS DOWN")
+                    self.state = "HEADSDOWN"
+                    self.expected_signals = {"headDown", "headUp"}
 
         if self.state == "FINISHED":
             pass
@@ -273,7 +279,7 @@ def main():
     # Central signal queue
     signal_queue = deque()
 
-    game = MafiaGame(4)
+    game = MafiaGame(3)
     while True:
         readable, _, _ = select.select(sockets, [], [], 0.05)
 
