@@ -1,10 +1,16 @@
 
 # TODO
-Christian: 
-- [x] assign to each player a role, tell it to them
-- [x] Figure out how you're going to process signals
-- [ ] ADD RASPBERRY PI AS CLIENT IN SERVER
+Kirt:
+Finish game logic for more players
+Add skeleton for play page
 
-# Current errors/Possible errors
-- Camera not opening on windows machines
-- What to do when someone puts their down and camera doesn't recognize them for that
+Christian: 
+- [ ] Connect to a web server
+
+Selena:
+- [ ] start website frontend, hosted locally, build skeleton of home page
+
+Jesus:
+- [ ] Adding gesture recognition to allow up to 8 players
+- [ ] Modify existing gesture to be able to support drawing a number 1-8 and recognize it to vote for a player
+
