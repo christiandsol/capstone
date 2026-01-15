@@ -1,10 +1,41 @@
 import { useState } from "react";
 
-function Lobby({ onStart }: { onStart: () => void }) {
+type LobbyProps = {
+  onStart: (name: string) => void;
+  onJoin: (name: string) => void;
+};
+
+function Lobby({ onStart, onJoin }: LobbyProps) {
+  const [name, setName] = useState("");
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setName(e.target.value);
+  };
   return (
     <div>
       <h1>Smart Mafia</h1>
-      <button onClick={onStart}>Join Game</button>
+      <input
+        type = "text"
+        id = "name"
+        value={name}
+        placeholder = "Enter your name here"
+        onChange={handleInputChange}
+      />
+
+      <br/>
+
+      <button onClick={() => onJoin(name)}>
+
+        Join Game
+        </button>
+      <h2>Active Players</h2>
+
+      
+      <button onClick={() => onStart(name)}>
+
+        Start Game
+        </button>
+
     </div>
   );
 }
@@ -12,7 +43,7 @@ function Lobby({ onStart }: { onStart: () => void }) {
 function Game() {
   return (
     <div>
-      <h1>🎭 Game Room</h1>
+      <h1>Game Room</h1>
       <p>Video grid will go here</p>
     </div>
   );
@@ -23,7 +54,9 @@ export default function App() {
 
   return (
     <div style={{ padding: 20 }}>
-      {page === "lobby" && <Lobby onStart={() => setPage("game")} />}
+
+      //!!!need to implement onJoin!!!
+      {page === "lobby" && <Lobby onJoin={()=>{}}onStart={() => setPage("game")} />}
       {page === "game" && <Game />}
     </div>
   );
