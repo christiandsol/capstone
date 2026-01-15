@@ -10,12 +10,12 @@ from util import send_json, receive_json, print_dic
 from voice import listen_for_command, listen_for_okay_mafia
 from player import Player
 from typing import Dict, Union, List, Deque
-from mafia import Game
+from mafia import MafiaGame
 
 # Socket setup
 HOST = "0.0.0.0"
 PORT = 5050
-MAX_PLAYERS = 10
+MAX_PLAYERS = 3
 
 def main():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -34,7 +34,7 @@ def main():
     # Central signal queue
     signal_queue = deque()
 
-    game = Game(2)
+    game = MafiaGame(MAX_PLAYERS)
     while True:
         readable, _, _ = select.select(sockets, [], [], 0.05)
 
@@ -64,6 +64,7 @@ def main():
                         continue
                     # add player_id to this reference client
                     game.clients[conn] = player_id
+                    game.players[player_id].last_signal["setup"] = True
                     sockets.append(conn)
                     pass
                 else:
@@ -75,8 +76,7 @@ def main():
                         continue
                     player_id = next_player_id
                     next_player_id += 1
-                    game.add_player(player_id)
-                    game.players[player_id - 1].last_signal["setup"] = True
+                    game.players[player_id].last_signal["setup"] = True
 
                     game.clients[conn] = player_id
                     sockets.append(conn)
@@ -106,20 +106,20 @@ def main():
                     print(f"RECEIVED signal {msg} — valid ")
                     action = msg["action"]
                     if action == "headDown":
-                        game.players[player - 1].last_signal["head"] = "down"
+                        game.players[player].last_signal["head"] = "down"
                     elif action == "headUp":
-                        game.players[player - 1].last_signal["head"] = "up"
+                        game.players[player].last_signal["head"] = "up"
                     elif action == "targeted":
                         print(f"STATE: {game.state} player: {player}")
-                        if game.players[player-1].isMafia and game.state == "MAFIAVOTE":
+                        if game.players[player].isMafia and game.state == "MAFIAVOTE":
                             print("1")
-                            game.players[player - 1].last_signal["kill"] = msg["target"]
-                        elif game.players[player-1].isDoctor and game.state == "DOCTORVOTE":
+                            game.players[player].last_signal["kill"] = msg["target"]
+                        elif game.players[player].isDoctor and game.state == "DOCTORVOTE":
                             print("2")
-                            game.players[player - 1].last_signal["save"] = msg["target"]
+                            game.players[player].last_signal["save"] = msg["target"]
                         else:
                             print("3")
-                            game.players[player - 1].last_signal["vote"] = msg["target"]
+                            game.players[player].last_signal["vote"] = msg["target"]
 
                 else:
                     pass
