@@ -29,6 +29,8 @@ Server (RUN FIRST, only need one laptop for this):
 (in a separate instance) Pose recognition client:
 ```python poserecognition.py```
 
+Host website: run in the frontend/smart-mafia directory to launch: ```npm run dev```
+
 
 # Voice Commands
 
