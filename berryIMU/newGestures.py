@@ -323,9 +323,9 @@ class EnhancedGestureRecognizer:
         # Feature-based classification rules (heuristic approach)
         # These can be refined with actual data
         self.digit_features = {
-            1: {'direction_changes': (0, 2), 'straightness': (0.7, 1.0), 'vertical_horizontal_ratio': (1.5, 100)},
+            1: {'direction_changes': (0, 1), 'straightness': (0.8, 1.0), 'vertical_horizontal_ratio': (1.5, 100), 'accel_peaks': (0, 10)},
             2: {'direction_changes': (1, 3), 'straightness': (0.3, 0.8), 'vertical_horizontal_ratio': (0.3, 1.5)},
-            3: {'direction_changes': (1, 3), 'straightness': (0.3, 0.8), 'vertical_horizontal_ratio': (0.3, 1.5)},
+            3: {'direction_changes': (0, 4), 'straightness': (0.2, 0.95), 'vertical_horizontal_ratio': (0.5, 3.0), 'accel_peaks': (5, 25)},
             4: {'direction_changes': (2, 4), 'straightness': (0.2, 0.6), 'vertical_horizontal_ratio': (0.5, 2.0)},
             5: {'direction_changes': (2, 5), 'straightness': (0.2, 0.7), 'vertical_horizontal_ratio': (0.5, 2.0)},
             6: {'direction_changes': (0, 2), 'loop_score': (0.3, 1.0), 'straightness': (0.0, 0.5)},
@@ -444,9 +444,9 @@ class EnhancedGestureRecognizer:
                 print(f"[Debug] Template matching distances: {all_distances}")
                 print(f"[Debug] Best template match: digit {best_match} with distance {best_score:.2f}")
             
-            # Lower threshold to be more lenient (was 5.0, now 10.0)
-            # This allows templates to match more easily
-            if best_match and best_score < 10.0:
+            # Template matching threshold - higher = more lenient
+            # Increased to 150.0 to allow templates to match even with some variation
+            if best_match and best_score < 150.0:
                 if self.debug:
                     print(f"[Debug] Using template match: digit {best_match}")
                 template_match_used = True
