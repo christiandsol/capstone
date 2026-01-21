@@ -646,7 +646,7 @@ if __name__ == "__main__":
     SERVER_PORT = 5050
     PLAYER_ID = 1
     DEBUG_IMU = True
-    DEBUG_RECOGNITION = False  # Set to True to see detailed recognition debug info
+    DEBUG_RECOGNITION = True  # Set to True to see detailed recognition debug info
     
     print("=== Enhanced Gesture Voting Client (Digits 1-8) ===")
     print("To test IMU readings only, run: python3 newGestures.py test")
