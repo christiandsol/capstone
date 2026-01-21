@@ -303,10 +303,11 @@ class EnhancedGestureRecognizer:
     # Template file path (stores templates in the same directory as this script)
     TEMPLATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'gesture_templates.pkl')
     
-    def __init__(self, template_file: Optional[str] = None):
+    def __init__(self, template_file: Optional[str] = None, debug: bool = False):
         self.tracker = TrajectoryTracker()
         self.feature_extractor = GestureFeatureExtractor()
         self.dtw_matcher = DTWMatcher()
+        self.debug = debug
         
         # Use custom template file path if provided, otherwise use default
         self.template_file = template_file if template_file else self.TEMPLATE_FILE
@@ -329,7 +330,7 @@ class EnhancedGestureRecognizer:
             5: {'direction_changes': (2, 5), 'straightness': (0.2, 0.7), 'vertical_horizontal_ratio': (0.5, 2.0)},
             6: {'direction_changes': (0, 2), 'loop_score': (0.3, 1.0), 'straightness': (0.0, 0.5)},
             7: {'direction_changes': (1, 3), 'straightness': (0.4, 0.9), 'vertical_horizontal_ratio': (0.3, 1.5)},
-            8: {'direction_changes': (0, 2), 'loop_score': (0.4, 1.0), 'gyro_rotation': (50, 1000)}
+            8: {'direction_changes': (0, 1), 'loop_score': (0.5, 1.0), 'gyro_rotation': (100, 500), 'path_length': (0.5, 3.0)}
         }
     
     def load_templates(self):
@@ -415,54 +416,92 @@ class EnhancedGestureRecognizer:
         # Extract features
         features = self.feature_extractor.extract_features(positions, samples)
         
+        if self.debug:
+            print(f"[Debug] Extracted features: {features}")
+        
         # Try template matching first (if templates exist)
+        template_match_used = False
         if any(len(templates) > 0 for templates in self.templates.values()):
             pos_array = np.array(positions)
             normalized_input = self.dtw_matcher.normalize_sequence(pos_array)
             
             best_match = None
             best_score = float('inf')
+            all_distances = {}
             
             for digit in range(1, 9):
-                for template in self.templates[digit]:
-                    distance = self.dtw_matcher.dtw_distance(normalized_input, template)
-                    if distance < best_score:
-                        best_score = distance
-                        best_match = digit
+                if len(self.templates[digit]) > 0:
+                    min_dist_for_digit = float('inf')
+                    for template in self.templates[digit]:
+                        distance = self.dtw_matcher.dtw_distance(normalized_input, template)
+                        min_dist_for_digit = min(min_dist_for_digit, distance)
+                        if distance < best_score:
+                            best_score = distance
+                            best_match = digit
+                    all_distances[digit] = min_dist_for_digit
             
-            # If template match is confident enough, use it
-            if best_match and best_score < 5.0:  # Threshold may need tuning
+            if self.debug:
+                print(f"[Debug] Template matching distances: {all_distances}")
+                print(f"[Debug] Best template match: digit {best_match} with distance {best_score:.2f}")
+            
+            # Lower threshold to be more lenient (was 5.0, now 10.0)
+            # This allows templates to match more easily
+            if best_match and best_score < 10.0:
+                if self.debug:
+                    print(f"[Debug] Using template match: digit {best_match}")
+                template_match_used = True
                 return best_match
+            elif self.debug:
+                print(f"[Debug] Template match rejected (distance {best_score:.2f} >= 10.0), using feature-based")
         
         # Fall back to feature-based classification
         scores = {}
         for digit in range(1, 9):
             score = 0.0
             digit_rules = self.digit_features.get(digit, {})
+            matched_features = []
             
             for feature_name, (min_val, max_val) in digit_rules.items():
                 if feature_name in features:
                     value = features[feature_name]
                     if min_val <= value <= max_val:
                         score += 1.0
+                        matched_features.append(feature_name)
                     else:
-                        # Penalize if far from expected range
+                        # Penalize if far from expected range (less penalty than before)
                         if value < min_val:
-                            score -= abs(value - min_val) / (min_val + 1)
+                            penalty = abs(value - min_val) / (min_val + 1) * 0.5
+                            score -= penalty
                         else:
-                            score -= abs(value - max_val) / (max_val + 1)
+                            penalty = abs(value - max_val) / (max_val + 1) * 0.5
+                            score -= penalty
             
             scores[digit] = score
+            if self.debug:
+                print(f"[Debug] Digit {digit}: score={score:.2f}, matched_features={matched_features}")
         
         # Find best match
         if scores:
             best_digit = max(scores, key=scores.get)
             best_score = scores[best_digit]
+            second_best_score = sorted(scores.values(), reverse=True)[1] if len(scores) > 1 else 0
             
-            # Need a minimum confidence threshold
-            if best_score > 1.0:  # At least 2 features match reasonably well
+            if self.debug:
+                print(f"[Debug] Best feature match: digit {best_digit} with score {best_score:.2f}")
+                print(f"[Debug] Second best score: {second_best_score:.2f}")
+            
+            # Higher confidence threshold - need at least 1.5 points AND clear winner
+            # Also require that best is significantly better than second best
+            score_difference = best_score - second_best_score
+            if best_score > 1.5 and score_difference > 0.5:
+                if self.debug:
+                    print(f"[Debug] Using feature-based match: digit {best_digit}")
                 return best_digit
+            elif self.debug:
+                print(f"[Debug] Feature match rejected (score {best_score:.2f} too low or too close to second)")
         
+        if self.debug:
+            print("[Debug] No confident match found, returning None")
         return None
 
 
@@ -471,13 +510,13 @@ class GestureVotingClient:
     Enhanced gesture voting client that supports digits 1-8.
     """
     
-    def __init__(self, server_ip: str, server_port: int, player_id: int, debug_imu: bool = False):
+    def __init__(self, server_ip: str, server_port: int, player_id: int, debug_imu: bool = False, debug_recognition: bool = False):
         self.server_ip = server_ip
         self.server_port = server_port
         self.player_id = player_id
         
         self.imu = BerryIMUInterface(debug=debug_imu)
-        self.recognizer = EnhancedGestureRecognizer()
+        self.recognizer = EnhancedGestureRecognizer(debug=debug_recognition)
     
     def _record_gesture_sequence(self, duration_s: float = 2.0, sample_rate_hz: float = 50.0, 
                                 debug: bool = False) -> List[Tuple[float, float, float, float, float, float]]:
@@ -607,11 +646,12 @@ if __name__ == "__main__":
     SERVER_PORT = 5050
     PLAYER_ID = 1
     DEBUG_IMU = True
+    DEBUG_RECOGNITION = False  # Set to True to see detailed recognition debug info
     
     print("=== Enhanced Gesture Voting Client (Digits 1-8) ===")
     print("To test IMU readings only, run: python3 newGestures.py test")
     print()
     
-    client = GestureVotingClient(SERVER_IP, SERVER_PORT, PLAYER_ID, debug_imu=DEBUG_IMU)
+    client = GestureVotingClient(SERVER_IP, SERVER_PORT, PLAYER_ID, debug_imu=DEBUG_IMU, debug_recognition=DEBUG_RECOGNITION)
     client.run_interactive()
 
