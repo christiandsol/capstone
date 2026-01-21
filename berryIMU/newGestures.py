@@ -524,7 +524,7 @@ class GestureVotingClient:
         input("Press Enter when ready to record...")
         
         print("Recording template...")
-        samples = self._record_gesture_sequence(duration_s=5.0, sample_rate_hz=50.0)
+        samples = self._record_gesture_sequence(duration_s=3.0, sample_rate_hz=50.0)
         self.recognizer.add_template(digit, samples)
         print(f"Template for digit {digit} recorded!")
     
