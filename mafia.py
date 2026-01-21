@@ -22,14 +22,13 @@ class MafiaGame:
 
         # Sockets to monitor
         self.clients : Dict[socket.socket, int]= {}
-        self.mafia, self.doctor = random.sample(range(1, self.player_cap + 1), 2)
-        self.players[self.mafia].isMafia = True
-        self.players[self.doctor].isDoctor = True
+        self.mafiaOne, self.mafiaTwo, self.doctor = random.sample(range(1, self.player_cap + 1), 3)
         # COMMENT THIS OUT LATER
         # self.mafia = 1
         # self.doctor = -1
         self.last_killed = -1
         self.last_saved = -1
+        self.mafia_count = -1
 
 
     def valid_signal(self, signal: Dict[str, Union[str, int]]):
@@ -57,11 +56,29 @@ class MafiaGame:
         """
         Checks who the mafia voted for, returns True if signal has been received
         """
-        last_kill = self.players[self.mafia].last_signal["kill"]
-        if last_kill:
-            print(f"Mafia voted to kill {last_kill}")
-            self.players[self.mafia].last_signal["kill"] = None
-            return last_kill
+        if self.players[self.mafiaOne].isAlive and self.players[self.mafiaTwo].isAlive:
+            last_kill_M1 = self.players[self.mafiaOne].last_signal["kill"]
+            last_kill_M2 = self.players[self.mafiaTwo].last_signal["kill"]
+            if last_kill_M1 == last_kill_M2:
+                print(f"Mafia voted to kill {last_kill_M1}")
+                self.players[self.mafiaOne].last_signal["kill"] = None
+                self.players[self.mafiaTwo].last_signal["kill"] = None
+                return last_kill_M1
+            else:
+                print("Please Redo. Mafia did not collectively agree.")
+                return -1
+        elif self.players[self.mafiaOne].isAlive:
+            last_kill = self.players[self.mafiaOne].last_signal["kill"]
+            if last_kill:
+                print(f"Mafia voted to kill {last_kill}")
+                self.players[self.mafiaOne].last_signal["kill"] = None
+                return last_kill
+        elif self.players[self.mafiaTwo].isAlive:
+            last_kill = self.players[self.mafiaTwo].last_signal["kill"]
+            if last_kill:
+                print(f"Mafia voted to kill {last_kill}")
+                self.players[self.mafiaTwo].last_signal["kill"] = None
+                return last_kill
         return -1
 
     def doctor_save(self):
@@ -108,10 +125,13 @@ class MafiaGame:
         return [winners[0] + 1]
     def check_game_finished(self):
         alive_count = 0
+        mafia_count = 0
         for player in self.players.values():
-            if player.isAlive:
-                alive_count += 1
-        if alive_count == 2:
+            if player.isMafia and player.isAlive:
+                mafia_count += 1
+            if not player.isMafia and player.isAlive:
+                civilian_count += 1
+        if mafia_count >= civilian_count:
             return True
         else:
             return False
@@ -127,12 +147,27 @@ class MafiaGame:
                 print("All players connected — starting game!")
                 command = listen_for_command()
                 if command == 2:
-                    self.state = "ASSIGN"
+                    self.state = "MAFIACOUNT"
                     self.expected_signals = {}
+
+        if self.state == "MAFIACOUNT":
+            command = listen_for_command()
+            if command == 3:
+                self.mafia_count = 1
+                self.players[self.mafiaOne].isMafia = True
+                self.players[self.doctor].isDoctor = True
+                self.state = "ASSIGN"
+            elif command == 4:
+                self.mafia_count = 2
+                self.players[self.mafiaOne].isMafia = True
+                self.players[self.mafiaTwo].isMafia = True
+                self.players[self.doctor].isDoctor = True
+                self.state = "ASSIGN"
+                
 
         if self.state == "ASSIGN":
             for socket, player_id in self.clients.items():
-                if player_id == self.mafia:
+                if player_id == self.mafiaOne or player_id == self.mafiaTwo:
                     send_json(socket, player_id, "mafia", None)
                 elif player_id == self.doctor:
                     send_json(socket, player_id, "doctor", None)
@@ -152,7 +187,7 @@ class MafiaGame:
 
         if self.state == "MAFIAVOTE":
 
-            if not self.check_heads_down([self.mafia]):
+            if not self.check_heads_down([self.mafiaOne, self.mafiaTwo]):
                 print("EVERYONE NEEDS TO HAVE THEIR HEAD DOWN EXCEPT MAFIA")
             else:
                 # print("MAFIA, signal who to kill")
@@ -228,14 +263,20 @@ class MafiaGame:
                     self.players[voted_out[0]].isAlive = False
                     print("DRUM ROLL...")
                     time.sleep(2)
-                    if voted_out[0] == self.mafia:
-                        print("CIVILIANS CORRECTLY VOTED OUT THE MAFIA, CIVILIANS WIN!!!")
-                        self.state = "FINISHED"
+                    if voted_out[0] == self.mafiaOne or voted_out[0] == self.mafiaTwo:
+                        self.mafia_count -= 1
+                        if self.mafia_count == 0:
+                            print("CIVILIANS CORRECTLY VOTED OUT THE MAFIA, CIVILIANS WIN!!!")
+                            self.state = "FINISHED"
+                        else:
+                            print("GAME CONTINUES, EVERYONE PUT YOUR HEADS DOWN")
+                            self.state = "HEADSDOWN"
+                            self.expected_signals = {"headDown", "headUp"}
                     elif self.check_game_finished():
                         print("MAFIA WINS")
                         self.state = "FINISHED"
                     else:
-                        print("CIVILIANS FAILED TO VOTE OUT THE MAFIA, GAME CONTINUES, EVERYONE PUT YOUR HEADS DOWN")
+                        print("GAME CONTINUES, EVERYONE PUT YOUR HEADS DOWN")
                         self.state = "HEADSDOWN"
                         self.expected_signals = {"headDown", "headUp"}
                 else:
