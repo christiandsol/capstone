@@ -54,6 +54,10 @@ class Pose:
         if os_name == "Windows":
             num = 0
             backend = cv2.CAP_DSHOW 
+        elif os_name == "Darwin":
+            num = 0
+            backend = cv2.CAP_AVFOUNDATION
+        
         else:
             num = 1
             backend = cv2.CAP_AVFOUNDATION
@@ -204,10 +208,10 @@ class Pose:
 
 
 if __name__ == "__main__":
-    RECEIVER_IP = "172.20.10.3"
+    RECEIVER_IP = "10.117.40.192"
     PORT = 5050
     # RASPBERRY PI IP HERE
-    PI_IP = "172.20.10.14"
+    PI_IP = "10.65.171.169"
     PI_PORT = 5051
     pose = Pose(PI_IP, PI_PORT)
     # pose.setup()
