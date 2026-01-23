@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import Game from "./pages/GameRoom";
 
 //this is the "server" to do actual server:
 //const socket = io("http://localhost:3000");\
@@ -49,14 +50,6 @@ function Lobby({ onStart, onJoin, players }: LobbyProps) {
   );
 }
 
-function Game() {
-  return (
-    <div>
-      <h1>Game Room</h1>
-      <p>Video grid will go here</p>
-    </div>
-  );
-}
 
 export default function App() {
   const [page, setPage] = useState<"lobby" | "game">("lobby");
