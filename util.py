@@ -3,6 +3,7 @@ import json
 from typing import Optional
 from typing import Dict
 from typing import Union
+from websockets.server import WebSocketServerProtocol
 
 
 # Number to body attribute mappings
@@ -11,9 +12,23 @@ CHIN = 152
 FOREHEAD = 10
 
 
-## ip address
-# RECEIVER_IP = "192.168.1.108"   # <-- put receiver's IP address here
-# PORT = 5050                   # must match the receiver's port
+async def send_json(ws: WebSocketServerProtocol, player_id: int, action: str, target): ## new sendjson
+    data = {
+        "player": player_id,
+        "action": action,
+        "target": target
+    }
+    await ws.send(json.dumps(data))
+
+
+def parse_json(message: str): ## new parse_json
+    try:
+        parsed = json.loads(message)
+        print(parsed)
+        return parsed
+    except json.JSONDecodeError:
+        print("Invalid JSON:", message)
+        return None
 
 def client_connect(RECEIVER_IP, PORT):
     """
@@ -61,20 +76,20 @@ def receive_json(conn: socket.socket) -> Dict[str, Union[str, int]]:
     return message
 
 
-def send_json(client: socket.socket ,player_id: int, action: str, target: Optional[str]):
-    """
-    @param player_id: number that identifies the player
-    @param action: action taken ("vote", "kill", "heal", "headUp", "headDown")
-
-    Sends over to server JSON with the data
-    """
-    data = {
-        "player": player_id,
-        "action": action,
-        "target": target
-    }
-    json_message = json.dumps(data)
-    client.sendall(json_message.encode("utf-8"))
+# def send_json(client: socket.socket ,player_id: int, action: str, target: Optional[str]):
+#     """
+#     @param player_id: number that identifies the player
+#     @param action: action taken ("vote", "kill", "heal", "headUp", "headDown")
+#
+#     Sends over to server JSON with the data
+#     """
+#     data = {
+#         "player": player_id,
+#         "action": action,
+#         "target": target
+#     }
+#     json_message = json.dumps(data)
+#     client.sendall(json_message.encode("utf-8"))
 
 ############### DEBUGGING ##############
 def print_dic(dic: Dict[str, Union[str, int]]):

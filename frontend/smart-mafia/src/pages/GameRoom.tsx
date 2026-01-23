@@ -1,10 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import io from "socket.io-client";
 
-const sendHeadPositionToServer = (newHeadPosition) => {
-
-}
-
 function Game() {
   const localVideoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -17,6 +13,9 @@ function Game() {
   const [isStarted, setIsStarted] = useState(false);
   const [useTestVideos, setUseTestVideos] = useState(false);
   const [headPosition, setHeadPosition] = useState("unknown");
+  const [playerId, setPlayerId] = useState(null);
+  const [role, setRole] = useState(null);
+  const gameSocketRef = useRef(null);
 
   // Determine video per tab (for testing only)
   const getTabVideo = () => {
@@ -101,8 +100,8 @@ function Game() {
     setStatus("Setting up canvas capture...");
 
     const canvas = document.createElement("canvas");
-    canvas.width = 640; //hardcoded
-    canvas.height = 480; //hardcoded
+    canvas.width = 640;
+    canvas.height = 480;
     canvasRef.current = canvas;
 
     const ctx = canvas.getContext("2d");
@@ -123,21 +122,104 @@ function Game() {
   };
 
   const connectToServer = () => {
-    setStatus("Connecting to server...");
+    setStatus("Connecting to servers...");
+
+    // Connect to WebRTC signaling server (for video streaming)
     socketRef.current = io("http://163.192.0.247:3001");
 
     socketRef.current.on("connect", () => {
-      console.log("Connected to signaling server");
+      console.log("[WebRTC] Connected to signaling server");
       socketRef.current.emit("join-room", "test-room");
-      setStatus("Connected! Waiting for other players...");
+      setStatus("Connected to video server! Connecting to game server...");
     });
 
     socketRef.current.on("connect_error", (error) => {
-      console.error("Socket connection error:", error);
-      setStatus("Error: Cannot connect to server. Is it running on port 3001?");
+      console.error("[WebRTC] Socket connection error:", error);
+      setStatus("Error: Cannot connect to video server on port 3001");
     });
 
     setupSignaling();
+
+    // Connect to Python game server (for game logic)
+    connectToGameServer();
+  };
+
+  const connectToGameServer = () => {
+    const GAME_SERVER_IP = "163.192.0.247";
+    const GAME_SERVER_PORT = 5050; // Your Python WebSocket server
+
+    try {
+      gameSocketRef.current = new WebSocket(`ws://${GAME_SERVER_IP}:${GAME_SERVER_PORT}`);
+
+      gameSocketRef.current.onopen = () => {
+        console.log("[Game] Connected to Python game server");
+        setStatus("Connected to game server!");
+
+        // Send setup signal (server will auto-assign player ID)
+        const setupMsg = {
+          action: "setup",
+          target: null
+        };
+        gameSocketRef.current.send(JSON.stringify(setupMsg));
+        console.log("[Game] Sent setup signal");
+      };
+
+      gameSocketRef.current.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        console.log("[Game] Received:", data);
+
+        // Handle player ID assignment
+        if (data.action === "player_id") {
+          setPlayerId(data.player);
+          console.log(`[Game] Assigned Player ID: ${data.player}`);
+          setStatus(`You are Player ${data.player}. Waiting for role assignment...`);
+        }
+
+        // Handle role assignment
+        if (data.action === "mafia" || data.action === "doctor" || data.action === "civilian") {
+          setRole(data.action);
+          console.log(`[Game] Role: ${data.action}`);
+          setStatus(`You are Player ${playerId} - Role: ${data.action.toUpperCase()}`);
+        }
+
+        // Handle other game messages
+        if (data.action === "night_result") {
+          console.log("[Game] Night result:", data.target);
+        }
+
+        if (data.action === "vote_result") {
+          console.log("[Game] Vote result:", data.target);
+        }
+      };
+
+      gameSocketRef.current.onerror = (error) => {
+        console.error("[Game] WebSocket error:", error);
+        setStatus("Error: Failed to connect to game server");
+      };
+
+      gameSocketRef.current.onclose = () => {
+        console.log("[Game] Disconnected from game server");
+        setStatus("Disconnected from game server");
+      };
+
+    } catch (error) {
+      console.error("[Game] Failed to connect:", error);
+      setStatus(`Error connecting to game server: ${error.message}`);
+    }
+  };
+
+  const sendHeadPositionToServer = (position) => {
+    if (gameSocketRef.current && gameSocketRef.current.readyState === WebSocket.OPEN && playerId) {
+      const msg = {
+        player: playerId,
+        action: position, // "headUp" or "headDown"
+        target: null
+      };
+      gameSocketRef.current.send(JSON.stringify(msg));
+      console.log("[Game] Sent head position:", position);
+    } else {
+      console.warn("[Game] Cannot send head position - not connected or no player ID");
+    }
   };
 
   const startHeadDetection = async (videoElement) => {
@@ -189,12 +271,13 @@ function Game() {
             setHeadPosition(newHeadPosition);
             console.log("Head position changed:", newHeadPosition);
 
-            // TODO: Send to your game server
-            // sendHeadPositionToServer(newHeadPosition);
+            // Send to game server
+            sendHeadPositionToServer(newHeadPosition);
           }
         } else {
           if (headPosition !== "headDown") {
             setHeadPosition("headDown");
+            sendHeadPositionToServer("headDown");
             console.log("No face detected - head down");
           }
         }
@@ -244,7 +327,7 @@ function Game() {
       peer.onconnectionstatechange = () => {
         console.log(`Peer ${otherId} state: ${peer.connectionState}`);
         if (peer.connectionState === "connected") {
-          setStatus("Connected to other player!");
+          console.log("Connected to other player's video!");
         }
       };
 
@@ -307,6 +390,9 @@ function Game() {
       if (socketRef.current) {
         socketRef.current.disconnect();
       }
+      if (gameSocketRef.current) {
+        gameSocketRef.current.close();
+      }
       Object.values(peerRefs.current).forEach((p) => p.close());
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((t) => t.stop());
@@ -319,6 +405,11 @@ function Game() {
     <div style={{ padding: "20px", fontFamily: "system-ui, sans-serif", background: "#1a1a1a", minHeight: "100vh", color: "white" }}>
       <div style={{ marginBottom: "20px", padding: "15px", background: "#2a2a2a", borderRadius: "8px", border: "1px solid #444" }}>
         <strong>Status:</strong> {status}
+        {playerId && (
+          <div style={{ marginTop: "10px", color: "#00aaff" }}>
+            <strong>Player ID:</strong> {playerId} | <strong>Role:</strong> {role ? role.toUpperCase() : "waiting..."}
+          </div>
+        )}
         {headPosition !== "unknown" && (
           <div style={{ marginTop: "10px", color: headPosition === "headUp" ? "#00ff00" : "#ff6600" }}>
             <strong>Head Position:</strong> {headPosition === "headUp" ? "UP ⬆️" : "DOWN ⬇️"}
@@ -440,4 +531,3 @@ function RemoteVideo({ stream }) {
 }
 
 export default Game;
-
