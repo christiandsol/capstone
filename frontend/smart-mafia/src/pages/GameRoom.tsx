@@ -124,7 +124,7 @@ function Game() {
 
   const connectToServer = () => {
     setStatus("Connecting to server...");
-    socketRef.current = io("http://localhost:3001");
+    socketRef.current = io("http://163.192.0.247:3001");
 
     socketRef.current.on("connect", () => {
       console.log("Connected to signaling server");
