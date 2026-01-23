@@ -13,6 +13,7 @@ function Game() {
   const [isStarted, setIsStarted] = useState(false);
   const [useTestVideos, setUseTestVideos] = useState(false);
   const [headPosition, setHeadPosition] = useState("unknown");
+  const headPositionRef = useRef("unknown");
   const [playerId, setPlayerId] = useState(null);
   const [role, setRole] = useState(null);
   const gameSocketRef = useRef(null);
@@ -209,7 +210,7 @@ function Game() {
   };
 
   const sendHeadPositionToServer = (position) => {
-    if (gameSocketRef.current && gameSocketRef.current.readyState === WebSocket.OPEN && playerId) {
+    if (gameSocketRef.current && gameSocketRef.current.readyState === WebSocket.OPEN) {//&& playerId) {
       const msg = {
         player: playerId,
         action: position, // "headUp" or "headDown"
@@ -266,20 +267,20 @@ function Game() {
           } else {
             newHeadPosition = "headDown";
           }
-
-          if (newHeadPosition !== headPosition) {
+          if (newHeadPosition !== headPositionRef.current) {
+            headPositionRef.current = newHeadPosition;
             setHeadPosition(newHeadPosition);
-            console.log("Head position changed:", newHeadPosition);
 
-            // Send to game server
+            console.log("Head position changed:", newHeadPosition);
             sendHeadPositionToServer(newHeadPosition);
           }
         } else {
-          if (headPosition !== "headDown") {
+          if (headPositionRef.current !== "headDown") {
+            headPositionRef.current = "headDown";
             setHeadPosition("headDown");
             sendHeadPositionToServer("headDown");
-            console.log("No face detected - head down");
           }
+
         }
       });
 
