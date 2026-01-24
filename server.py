@@ -110,10 +110,12 @@ class MafiaGame:
 
             self.state = "HEADSDOWN"
             self.expected_signals = {"headUp", "headDown"}
+            print("Moving on to mafia stage, everyone put head down please")
 
         if self.state == "HEADSDOWN" and self.check_heads_down([]):
             self.state = "MAFIAVOTE"
             self.expected_signals = {"headUp", "headDown", "targeted"}
+            print("MOVING ON TO MAFIA VOTE STAGE")
 
         if self.state == "MAFIAVOTE":
             if self.check_heads_down([self.mafia]):
