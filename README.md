@@ -1,43 +1,18 @@
+# Server-side/deployment 
+On server side, to handle joining rooms run `node server.js` in working directory /home/opc/capstone/frontend/smart-mafia/server (or just append the directory)
 
-# Manual
-
-# Finish Lab 3
-# Set up Conda Environment
-# 
-
-## Arguments: 
-- n <num>: number of people[Required]
-- m <num>: number of mafias[Optional]
-    - default = 1
-- e: medic[Optional]
-    - default = no medics
+Also run command: `python server.py`, with conda environment `capstone` activated
 
 
-# Dependencies
-- conda environment with: 
-    - python 3.10 at least
-    - openCV installed
-    conda install -c conda-forge opencv
-        ```conda install -c conda-forge opencv```
-    - mediapipe installed (install in conda environment)
-        ```pip install mediapipe```
+# Usage
 
-# Running
-Server (RUN FIRST, only need one laptop for this):
-```python server.py```
+## Camera activating tutorial
 
-(in a separate instance) Pose recognition client:
-```python poserecognition.py```
+To be able to use our application, you must allow it to use our camera, but because (as of right now), we are using the http protocol rather than the https protocol, when viewing our application, it won't prompt you permission to use your camera and will instead block it. We need to bypass this, we will give you a tutorial here. It is possible among all browsers to do this, but it's easiest for chrome, and we assume almost everyone uses and if not has chrome downloaded. If you are using another browser, please look up 'How to allow non secure http website camera access'. Now on with the tutorial. 
 
-Host website: run in the frontend/smart-mafia directory to launch: ```npm run dev```
+Before joining our website, look up on your google chrome search bar `chrome://flags/#unsafely-treat-insecure-origin-as-secure` and enable the flag. You must also type in or paste our website address here: `http://163.192.0.247`. Now you must restart chrome, there should be some sort of button that shows when you have enabled the flag to do so, do so. Now you have everything you need to be able to start
 
+## Using the platform
 
-# Voice Commands
+Now you can go ahead and visit [our website]http://163.192.0.247 and start a game!
 
-- "okay mafia": computer constantly listens for this command, when heard starts listening for other commands, say "okay mafia" before any voice command input
-- "assign roles": use this command when players are ready to start and receive their roles
-    - after this command call assign roles function 
-- "ready to vote": use this command when players are done discussing who to vote as mafia
-    - after this command call gesture recognition start
-- "the sun has set": use this command to start the night phase
-    - call pose recognition to start, making sure all heads are down
