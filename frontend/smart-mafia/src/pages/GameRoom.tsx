@@ -1,25 +1,34 @@
 import { useEffect, useRef, useState } from "react";
-import io from "socket.io-client";
+import io, { Socket } from "socket.io-client";
+
+// Extend Window interface for MediaPipe
+declare global {
+  interface Window {
+    FaceMesh: any;
+    webkitSpeechRecognition: any;
+    SpeechRecognition: any;
+  }
+}
 
 function Game() {
-  const localVideoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const socketRef = useRef();
-  const localStreamRef = useRef();
-  const peerRefs = useRef({});
-  const animationFrameRef = useRef();
-  const [remoteStreams, setRemoteStreams] = useState([]);
-  const [status, setStatus] = useState("Click 'Start' to begin");
-  const [isStarted, setIsStarted] = useState(false);
-  const [useTestVideos, setUseTestVideos] = useState(false);
-  const [headPosition, setHeadPosition] = useState("unknown");
-  const headPositionRef = useRef("unknown");
-  const [playerId, setPlayerId] = useState(null);
-  const [role, setRole] = useState(null);
-  const gameSocketRef = useRef(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const socketRef = useRef<Socket | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const peerRefs = useRef<{ [key: string]: RTCPeerConnection }>({});
+  const animationFrameRef = useRef<number | null>(null);
+  const [remoteStreams, setRemoteStreams] = useState<MediaStream[]>([]);
+  const [status, setStatus] = useState<string>("Click 'Start' to begin");
+  const [isStarted, setIsStarted] = useState<boolean>(false);
+  const [useTestVideos, setUseTestVideos] = useState<boolean>(false);
+  const [headPosition, setHeadPosition] = useState<string>("unknown");
+  const [playerId, setPlayerId] = useState<number | null>(null);
+  const [role, setRole] = useState<string | null>(null);
+  const gameSocketRef = useRef<WebSocket | null>(null);
+  const [isListening, setIsListening] = useState<boolean>(false);
+  const recognitionRef = useRef<any>(null);
 
-  // Determine video per tab (for testing only)
-  const getTabVideo = () => {
+  const getTabVideo = (): string => {
     const existing = sessionStorage.getItem("tabVideo");
     if (existing) return existing;
 
@@ -29,7 +38,7 @@ function Game() {
     return videoFile;
   };
 
-  const startStream = async () => {
+  const startStream = async (): Promise<void> => {
     try {
       if (useTestVideos) {
         await startTestVideoStream();
@@ -38,15 +47,15 @@ function Game() {
       }
     } catch (error) {
       console.error("Setup error:", error);
-      setStatus(`Error: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      setStatus(`Error: ${errorMessage}`);
     }
   };
 
-  const startRealCameraStream = async () => {
+  const startRealCameraStream = async (): Promise<void> => {
     setStatus("Requesting camera access...");
 
     try {
-      // Request real webcam
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: 640, height: 480 },
         audio: false
@@ -54,30 +63,32 @@ function Game() {
 
       console.log("Camera stream obtained:", stream.getTracks());
 
-      localVideoRef.current.srcObject = stream;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
       localStreamRef.current = stream;
 
       setStatus("Camera connected! Connecting to server...");
       setIsStarted(true);
 
       connectToServer();
-
-      // Start MediaPipe head detection
       startHeadDetection(localVideoRef.current);
 
     } catch (error) {
-      if (error.name === "NotAllowedError") {
-        setStatus("Error: Camera access denied. Please allow camera access and try again.");
-      } else if (error.name === "NotFoundError") {
-        setStatus("Error: No camera found. Connect a camera and try again.");
-      } else {
-        setStatus(`Error: ${error.message}`);
+      if (error instanceof Error) {
+        if (error.name === "NotAllowedError") {
+          setStatus("Error: Camera access denied. Please allow camera access and try again.");
+        } else if (error.name === "NotFoundError") {
+          setStatus("Error: No camera found. Connect a camera and try again.");
+        } else {
+          setStatus(`Error: ${error.message}`);
+        }
       }
       throw error;
     }
   };
 
-  const startTestVideoStream = async () => {
+  const startTestVideoStream = async (): Promise<void> => {
     const videoFile = getTabVideo();
     setStatus(`Loading ${videoFile}...`);
 
@@ -89,8 +100,8 @@ function Game() {
     video.style.display = "none";
     document.body.appendChild(video);
 
-    await new Promise((resolve, reject) => {
-      video.onloadedmetadata = resolve;
+    await new Promise<void>((resolve, reject) => {
+      video.onloadedmetadata = () => resolve();
       video.onerror = () => reject(new Error(`Failed to load ${videoFile}`));
       setTimeout(() => reject(new Error("Video load timeout")), 10000);
     });
@@ -107,83 +118,83 @@ function Game() {
 
     const ctx = canvas.getContext("2d");
 
-    const drawFrame = () => {
+    const drawFrame = (): void => {
       if (video.paused || video.ended) return;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      }
       animationFrameRef.current = requestAnimationFrame(drawFrame);
     };
     drawFrame();
 
     const stream = canvas.captureStream(30);
-    localVideoRef.current.srcObject = stream;
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = stream;
+    }
     localStreamRef.current = stream;
 
     setIsStarted(true);
     connectToServer();
   };
 
-  const connectToServer = () => {
+  const connectToServer = (): void => {
     setStatus("Connecting to servers...");
 
-    // Connect to WebRTC signaling server (for video streaming)
-    socketRef.current = io("http://163.192.0.247:3001");
+    // socketRef.current = io("http://163.192.0.247:3001");
+    socketRef.current = io();
 
     socketRef.current.on("connect", () => {
       console.log("[WebRTC] Connected to signaling server");
-      socketRef.current.emit("join-room", "test-room");
+      socketRef.current?.emit("join-room", "test-room");
       setStatus("Connected to video server! Connecting to game server...");
     });
 
-    socketRef.current.on("connect_error", (error) => {
+    socketRef.current.on("connect_error", (error: Error) => {
       console.error("[WebRTC] Socket connection error:", error);
       setStatus("Error: Cannot connect to video server on port 3001");
     });
 
     setupSignaling();
-
-    // Connect to Python game server (for game logic)
     connectToGameServer();
   };
 
-  const connectToGameServer = () => {
-    const GAME_SERVER_IP = "163.192.0.247";
-    const GAME_SERVER_PORT = 5050; // Your Python WebSocket server
+  const connectToGameServer = (): void => {
+    // const GAME_SERVER_IP = "163.192.0.247";
+    const GAME_SERVER_PORT = 5050;
 
     try {
-      gameSocketRef.current = new WebSocket(`ws://${GAME_SERVER_IP}:${GAME_SERVER_PORT}`);
+      // gameSocketRef.current = new WebSocket(`ws://${GAME_SERVER_IP}:${GAME_SERVER_PORT}`);
+      gameSocketRef.current = new WebSocket(`ws://${window.location.hostname}:${GAME_SERVER_PORT}`);
+
 
       gameSocketRef.current.onopen = () => {
         console.log("[Game] Connected to Python game server");
         setStatus("Connected to game server!");
 
-        // Send setup signal (server will auto-assign player ID)
         const setupMsg = {
           action: "setup",
           target: null
         };
-        gameSocketRef.current.send(JSON.stringify(setupMsg));
+        gameSocketRef.current?.send(JSON.stringify(setupMsg));
         console.log("[Game] Sent setup signal");
       };
 
-      gameSocketRef.current.onmessage = (event) => {
+      gameSocketRef.current.onmessage = (event: MessageEvent) => {
         const data = JSON.parse(event.data);
         console.log("[Game] Received:", data);
 
-        // Handle player ID assignment
         if (data.action === "player_id") {
           setPlayerId(data.player);
           console.log(`[Game] Assigned Player ID: ${data.player}`);
           setStatus(`You are Player ${data.player}. Waiting for role assignment...`);
         }
 
-        // Handle role assignment
         if (data.action === "mafia" || data.action === "doctor" || data.action === "civilian") {
           setRole(data.action);
           console.log(`[Game] Role: ${data.action}`);
           setStatus(`You are Player ${playerId} - Role: ${data.action.toUpperCase()}`);
         }
 
-        // Handle other game messages
         if (data.action === "night_result") {
           console.log("[Game] Night result:", data.target);
         }
@@ -193,7 +204,7 @@ function Game() {
         }
       };
 
-      gameSocketRef.current.onerror = (error) => {
+      gameSocketRef.current.onerror = (error: Event) => {
         console.error("[Game] WebSocket error:", error);
         setStatus("Error: Failed to connect to game server");
       };
@@ -205,26 +216,123 @@ function Game() {
 
     } catch (error) {
       console.error("[Game] Failed to connect:", error);
-      setStatus(`Error connecting to game server: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      setStatus(`Error connecting to game server: ${errorMessage}`);
     }
   };
 
-  const sendHeadPositionToServer = (position) => {
-    if (gameSocketRef.current && gameSocketRef.current.readyState === WebSocket.OPEN) {//&& playerId) {
+  const sendHeadPositionToServer = (position: string): void => {
+    if (gameSocketRef.current && gameSocketRef.current.readyState === WebSocket.OPEN) {
       const msg = {
         player: playerId,
-        action: position, // "headUp" or "headDown"
+        action: position,
         target: null
       };
       gameSocketRef.current.send(JSON.stringify(msg));
       console.log("[Game] Sent head position:", position);
     } else {
-      console.warn("[Game] Cannot send head position - not connected or no player ID");
+      console.warn("[Game] Cannot send head position - not connected");
     }
   };
 
-  const startHeadDetection = async (videoElement) => {
-    // Dynamically load MediaPipe FaceMesh
+  const sendVoiceCommand = (command: number): void => {
+    if (gameSocketRef.current && gameSocketRef.current.readyState === WebSocket.OPEN) {
+      const msg = {
+        player: playerId,
+        action: "voice_command",
+        target: command
+      };
+      gameSocketRef.current.send(JSON.stringify(msg));
+      console.log("[Game] Sent voice command:", command);
+    } else {
+      console.warn("[Game] Cannot send voice command - not connected");
+    }
+  };
+
+  const startVoiceRecognition = (): void => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert("Speech recognition not supported in this browser. Please use Chrome or Edge.");
+      return;
+    }
+
+    if (!recognitionRef.current) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        console.log("[Voice] Listening started...");
+      };
+
+      recognition.onresult = (event: any) => {
+        const last = event.results.length - 1;
+        const text = event.results[last][0].transcript.toLowerCase();
+        console.log("[Voice] Heard:", text);
+
+        const COMMAND_ALTERNATIVES: { [key: string]: number } = {
+          "ready to start": 1,
+          "ready start": 1,
+          "start game": 1,
+          "start": 1,
+          "assign players": 2,
+          "assign play": 2,
+          "find players": 2,
+          "sign players": 2,
+          "assigned players": 2,
+          "ready to vote": 3,
+          "navigate to vote": 3,
+          "ready to vogt": 3,
+          "night time": 4,
+          "night times": 4,
+          "nite times": 4,
+          "nite time": 4
+        };
+
+        for (const [phrase, code] of Object.entries(COMMAND_ALTERNATIVES)) {
+          if (text.includes(phrase)) {
+            console.log(`[Voice] Command matched: "${phrase}" → Code: ${code}`);
+            setStatus(`Voice command: ${phrase.toUpperCase()}`);
+            sendVoiceCommand(code);
+            break;
+          }
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error("[Voice] Error:", event.error);
+        if (event.error === 'no-speech') {
+          console.log("[Voice] No speech detected, still listening...");
+        }
+      };
+
+      recognition.onend = () => {
+        console.log("[Voice] Recognition ended");
+        if (isListening) {
+          recognition.start();
+        }
+      };
+
+      recognitionRef.current = recognition;
+    }
+
+    recognitionRef.current.start();
+  };
+
+  const stopVoiceRecognition = (): void => {
+    if (recognitionRef.current) {
+      setIsListening(false);
+      recognitionRef.current.stop();
+      console.log("[Voice] Stopped listening");
+    }
+  };
+
+  const startHeadDetection = async (videoElement: HTMLVideoElement | null): Promise<void> => {
+    if (!videoElement) return;
+
     const script = document.createElement("script");
     script.src = "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js";
     document.head.appendChild(script);
@@ -233,7 +341,7 @@ function Game() {
       const FaceMesh = window.FaceMesh;
 
       const faceMesh = new FaceMesh({
-        locateFile: (file) => {
+        locateFile: (file: string) => {
           return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
         }
       });
@@ -245,11 +353,10 @@ function Game() {
         minTrackingConfidence: 0.5
       });
 
-      faceMesh.onResults((results) => {
+      faceMesh.onResults((results: any) => {
         if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
           const landmarks = results.multiFaceLandmarks[0];
 
-          // Landmark indices (same as your Python code)
           const NOSE = 1;
           const CHIN = 152;
           const FOREHEAD = 10;
@@ -261,31 +368,26 @@ function Game() {
           const headHeight = chin.y - forehead.y;
           const nosePosRelative = nose.y - forehead.y;
 
-          let newHeadPosition;
+          let newHeadPosition: string;
           if (nosePosRelative < headHeight * 0.666666) {
             newHeadPosition = "headUp";
           } else {
             newHeadPosition = "headDown";
           }
-          if (newHeadPosition !== headPositionRef.current) {
-            headPositionRef.current = newHeadPosition;
-            setHeadPosition(newHeadPosition);
 
-            console.log("Head position changed:", newHeadPosition);
+          if (newHeadPosition !== headPosition) {
+            setHeadPosition(newHeadPosition);
             sendHeadPositionToServer(newHeadPosition);
           }
         } else {
-          if (headPositionRef.current !== "headDown") {
-            headPositionRef.current = "headDown";
+          if (headPosition !== "headDown") {
             setHeadPosition("headDown");
             sendHeadPositionToServer("headDown");
           }
-
         }
       });
 
-      // Process video frames
-      const detectFrame = async () => {
+      const detectFrame = async (): Promise<void> => {
         if (videoElement && videoElement.readyState === 4) {
           await faceMesh.send({ image: videoElement });
         }
@@ -295,21 +397,23 @@ function Game() {
     };
   };
 
-  const setupSignaling = () => {
-    const createPeer = (otherId) => {
+  const setupSignaling = (): void => {
+    const createPeer = (otherId: string): RTCPeerConnection => {
       console.log(`Creating peer connection for ${otherId}`);
       const peer = new RTCPeerConnection({
         iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
       });
 
       if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach((track) => {
+        localStreamRef.current.getTracks().forEach((track: MediaStreamTrack) => {
           console.log(`Adding ${track.kind} track to peer ${otherId}`);
-          peer.addTrack(track, localStreamRef.current);
+          if (localStreamRef.current) {
+            peer.addTrack(track, localStreamRef.current);
+          }
         });
       }
 
-      peer.ontrack = (event) => {
+      peer.ontrack = (event: RTCTrackEvent) => {
         console.log(`Received remote track from ${otherId}:`, event.track.kind);
         const remoteStream = event.streams[0];
         setRemoteStreams((prev) => {
@@ -319,9 +423,9 @@ function Game() {
         });
       };
 
-      peer.onicecandidate = (e) => {
+      peer.onicecandidate = (e: RTCPeerConnectionIceEvent) => {
         if (e.candidate) {
-          socketRef.current.emit("signal", { to: otherId, data: e.candidate });
+          socketRef.current?.emit("signal", { to: otherId, data: e.candidate });
         }
       };
 
@@ -336,7 +440,7 @@ function Game() {
       return peer;
     };
 
-    socketRef.current.on("user-joined", async (id) => {
+    socketRef.current?.on("user-joined", async (id: string) => {
       console.log(`User joined: ${id}`);
       if (!localStreamRef.current) {
         console.error("Local stream not ready!");
@@ -348,13 +452,13 @@ function Game() {
         const offer = await peer.createOffer();
         await peer.setLocalDescription(offer);
         console.log("Sending offer to", id);
-        socketRef.current.emit("signal", { to: id, data: offer });
+        socketRef.current?.emit("signal", { to: id, data: offer });
       } catch (error) {
         console.error("Error creating offer:", error);
       }
     });
 
-    socketRef.current.on("signal", async ({ from, data }) => {
+    socketRef.current?.on("signal", async ({ from, data }: { from: string; data: any }) => {
       console.log(`Signal from ${from}:`, data.type || "ice-candidate");
 
       if (!localStreamRef.current) {
@@ -371,7 +475,7 @@ function Game() {
           const answer = await peer.createAnswer();
           await peer.setLocalDescription(answer);
           console.log("Sending answer to", from);
-          socketRef.current.emit("signal", { to: from, data: answer });
+          socketRef.current?.emit("signal", { to: from, data: answer });
         } else if (data.type === "answer") {
           await peer.setRemoteDescription(new RTCSessionDescription(data));
         } else if (data.candidate) {
@@ -385,7 +489,7 @@ function Game() {
 
   useEffect(() => {
     return () => {
-      if (animationFrameRef.current) {
+      if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current);
       }
       if (socketRef.current) {
@@ -393,6 +497,9 @@ function Game() {
       }
       if (gameSocketRef.current) {
         gameSocketRef.current.close();
+      }
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
       }
       Object.values(peerRefs.current).forEach((p) => p.close());
       if (localStreamRef.current) {
@@ -416,7 +523,36 @@ function Game() {
             <strong>Head Position:</strong> {headPosition === "headUp" ? "UP ⬆️" : "DOWN ⬇️"}
           </div>
         )}
+        {isListening && (
+          <div style={{ marginTop: "10px", color: "#ff00ff" }}>
+            <strong>🎤 Listening for voice commands...</strong>
+          </div>
+        )}
       </div>
+
+      {isStarted && (
+        <div style={{ marginBottom: "20px" }}>
+          <button
+            onClick={isListening ? stopVoiceRecognition : startVoiceRecognition}
+            style={{
+              padding: "10px 20px",
+              fontSize: "16px",
+              background: isListening ? "#ff4444" : "#44aa44",
+              color: "white",
+              border: "none",
+              borderRadius: "8px",
+              cursor: "pointer",
+              fontWeight: "bold",
+              boxShadow: "0 4px 6px rgba(0,0,0,0.3)"
+            }}
+          >
+            {isListening ? "🎤 Stop Listening" : "🎤 Start Voice Commands"}
+          </button>
+          <div style={{ marginTop: "10px", color: "#888", fontSize: "14px" }}>
+            Say: "assign players", "ready to start", "ready to vote", or "night time"
+          </div>
+        </div>
+      )}
 
       {!isStarted && (
         <div style={{ marginBottom: "30px" }}>
@@ -445,8 +581,8 @@ function Game() {
               fontWeight: "bold",
               boxShadow: "0 4px 6px rgba(0,0,0,0.3)"
             }}
-            onMouseOver={(e) => e.target.style.background = "#0052a3"}
-            onMouseOut={(e) => e.target.style.background = "#0066cc"}
+            onMouseOver={(e) => (e.target as HTMLButtonElement).style.background = "#0052a3"}
+            onMouseOut={(e) => (e.target as HTMLButtonElement).style.background = "#0066cc"}
           >
             {useTestVideos ? "🎬 Start Test Video" : "🎥 Start Camera"}
           </button>
@@ -489,8 +625,8 @@ function Game() {
   );
 }
 
-function RemoteVideo({ stream }) {
-  const ref = useRef(null);
+function RemoteVideo({ stream }: { stream: MediaStream }) {
+  const ref = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     if (ref.current && ref.current.srcObject !== stream) {
