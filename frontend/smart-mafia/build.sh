@@ -1,31 +1,28 @@
 #!/bin/bash
 set -e
 
-# ------------------------
-# Deployment script
-# ------------------------
-
-# Build the project
 echo "Building frontend..."
 npm install
 npm run build
 echo "Build finished."
 
-# Versioned folder name (git short hash)
+# Versioned build folder name based on git commit hash
 BUILD_ID=$(git rev-parse --short HEAD)
 DEST="/var/www/builds/$BUILD_ID"
 
-# Ensure parent directory exists (with sudo)
 echo "Creating build directory $DEST..."
 sudo mkdir -p "$DEST"
 
-# Move the build to the versioned folder (with sudo)
-echo "Moving build to $DEST..."
-sudo mv dist "$DEST"
+echo "Copying build files..."
+sudo cp -r dist/* "$DEST/"
 
-# Update the 'current' symlink to point to the new build (with sudo)
+echo "Setting permissions..."
+sudo chmod -R 755 /var/www/builds
+
+# Update the 'current' symlink to point to the new build
 echo "Updating symlink /var/www/current -> $DEST"
 sudo ln -sfn "$DEST" /var/www/current
+
 
 echo "Deployment of build $BUILD_ID completed!"
 
