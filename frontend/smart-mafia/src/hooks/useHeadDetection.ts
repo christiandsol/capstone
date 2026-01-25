@@ -7,7 +7,7 @@ declare global {
 }
 
 export const useHeadDetection = (
-    videoRef: React.RefObject<HTMLVideoElement>,
+    videoRef: React.RefObject<HTMLVideoElement | null>,
     onHeadPositionChange: (position: string) => void
 ): void => {
     const lastPositionRef = useRef<string>('unknown');

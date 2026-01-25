@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 
 interface UseMediaStreamReturn {
-    localVideoRef: React.RefObject<HTMLVideoElement>;
+    localVideoRef: React.RefObject<HTMLVideoElement | null>;
     localStream: MediaStream | null;
     startCamera: () => Promise<void>;
     startTestVideo: () => Promise<void>;
