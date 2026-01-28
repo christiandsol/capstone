@@ -34,7 +34,32 @@ export const useWebRTC = (
         const createPeer = (otherId: string): RTCPeerConnection => {
             console.log(`Creating peer connection for ${otherId}`);
             const peer = new RTCPeerConnection({
-                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+                iceServers: [{ urls: 'stun:stun.l.google.com:19302' },
+                {
+                    urls: "stun:stun.relay.metered.ca:80",
+                },
+                {
+                    urls: "turn:global.relay.metered.ca:80",
+                    username: "a295d4459b9a0d892de6c1e1",
+                    credential: "th2z+Q12WSG6RIbU",
+                },
+                {
+                    urls: "turn:global.relay.metered.ca:80?transport=tcp",
+                    username: "a295d4459b9a0d892de6c1e1",
+                    credential: "th2z+Q12WSG6RIbU",
+                },
+                {
+                    urls: "turn:global.relay.metered.ca:443",
+                    username: "a295d4459b9a0d892de6c1e1",
+                    credential: "th2z+Q12WSG6RIbU",
+                },
+                {
+                    urls: "turns:global.relay.metered.ca:443?transport=tcp",
+                    username: "a295d4459b9a0d892de6c1e1",
+                    credential: "th2z+Q12WSG6RIbU",
+                },
+                ],
+
             });
 
             localStream.getTracks().forEach((track: MediaStreamTrack) => {
