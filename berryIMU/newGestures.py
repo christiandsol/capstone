@@ -323,10 +323,10 @@ class EnhancedGestureRecognizer:
         # Feature-based classification rules (heuristic approach)
         # These can be refined with actual data
         self.digit_features = {
-            1: {'direction_changes': (0, 1), 'straightness': (0.8, 1.0), 'vertical_horizontal_ratio': (1.5, 100), 'accel_peaks': (0, 10)},
+            1: {'direction_changes': (0, 1), 'straightness': (0.8, 1.0), 'vertical_horizontal_ratio': (1.5, 100), 'accel_peaks': (0, 15)},
             2: {'direction_changes': (1, 3), 'straightness': (0.3, 0.8), 'vertical_horizontal_ratio': (0.3, 1.5)},
             3: {'direction_changes': (0, 4), 'straightness': (0.2, 0.95), 'vertical_horizontal_ratio': (0.5, 3.0), 'accel_peaks': (5, 25)},
-            4: {'direction_changes': (2, 4), 'straightness': (0.2, 0.6), 'vertical_horizontal_ratio': (0.5, 2.0)},
+            4: {'direction_changes': (0, 3), 'straightness': (0.4, 0.75), 'vertical_horizontal_ratio': (0.4, 1.2), 'accel_peaks': (15, 30)},
             5: {'direction_changes': (2, 5), 'straightness': (0.2, 0.7), 'vertical_horizontal_ratio': (0.5, 2.0)},
             6: {'direction_changes': (0, 2), 'loop_score': (0.3, 1.0), 'straightness': (0.0, 0.5)},
             7: {'direction_changes': (1, 3), 'straightness': (0.4, 0.9), 'vertical_horizontal_ratio': (0.3, 1.5)},
@@ -417,7 +417,11 @@ class EnhancedGestureRecognizer:
         features = self.feature_extractor.extract_features(positions, samples)
         
         if self.debug:
-            print(f"[Debug] Extracted features: {features}")
+            print(f"\n[Debug] ========== RECOGNITION ANALYSIS ==========")
+            print(f"[Debug] Extracted features:")
+            for feat_name, feat_value in features.items():
+                print(f"[Debug]   {feat_name}: {feat_value:.4f}")
+            print(f"[Debug] ===========================================\n")
         
         # Try template matching first (if templates exist)
         template_match_used = False
@@ -441,18 +445,54 @@ class EnhancedGestureRecognizer:
                     all_distances[digit] = min_dist_for_digit
             
             if self.debug:
-                print(f"[Debug] Template matching distances: {all_distances}")
+                print(f"\n[Debug] ========== TEMPLATE MATCHING ==========")
+                print(f"[Debug] Template distances for each digit:")
+                for d in sorted(all_distances.keys()):
+                    marker = " <-- BEST" if d == best_match else ""
+                    print(f"[Debug]   Digit {d}: {all_distances[d]:.2f}{marker}")
                 print(f"[Debug] Best template match: digit {best_match} with distance {best_score:.2f}")
+                print(f"[Debug] Threshold: {best_score:.2f} < 150.0? {best_score < 150.0}")
+                print(f"[Debug] ========================================\n")
             
             # Template matching threshold - higher = more lenient
             # Increased to 150.0 to allow templates to match even with some variation
             if best_match and best_score < 150.0:
-                if self.debug:
-                    print(f"[Debug] Using template match: digit {best_match}")
-                template_match_used = True
-                return best_match
+                # Check if best match is significantly better than second best
+                # If distances are too close, the match isn't confident
+                if len(all_distances) > 1:
+                    sorted_distances = sorted(all_distances.values())
+                    second_best_distance = sorted_distances[1] if len(sorted_distances) > 1 else float('inf')
+                    distance_difference = second_best_distance - best_score
+                    distance_ratio = best_score / second_best_distance if second_best_distance > 0 else 1.0
+                    
+                    if self.debug:
+                        print(f"[Debug] Confidence check:")
+                        print(f"[Debug]   Second best distance: {second_best_distance:.2f}")
+                        print(f"[Debug]   Distance difference: {distance_difference:.2f} (need > 15.0)")
+                        print(f"[Debug]   Distance ratio: {distance_ratio:.2f} (need < 0.85)")
+                        print(f"[Debug]   Ratio check: {distance_ratio < 0.85}")
+                        print(f"[Debug]   Difference check: {distance_difference > 15.0}")
+                    
+                    # Require at least 15% better (ratio < 0.85) OR at least 15 points difference
+                    # This prevents choosing a match when templates are too similar
+                    if distance_ratio < 0.85 or distance_difference > 15.0:
+                        if self.debug:
+                            print(f"[Debug] ✓ ACCEPTED: Using template match: digit {best_match} (confident match)")
+                        template_match_used = True
+                        return best_match
+                    else:
+                        if self.debug:
+                            print(f"[Debug] ✗ REJECTED: Template match too close")
+                            print(f"[Debug]   Difference {distance_difference:.2f} < 15.0 AND ratio {distance_ratio:.2f} >= 0.85")
+                            print(f"[Debug]   Falling back to feature-based classification")
+                else:
+                    # Only one template exists, use it if below threshold
+                    if self.debug:
+                        print(f"[Debug] Using template match: digit {best_match} (only template available)")
+                    template_match_used = True
+                    return best_match
             elif self.debug:
-                print(f"[Debug] Template match rejected (distance {best_score:.2f} >= 10.0), using feature-based")
+                print(f"[Debug] Template match rejected (distance {best_score:.2f} >= 150.0), using feature-based")
         
         # Fall back to feature-based classification
         scores = {}
@@ -478,7 +518,25 @@ class EnhancedGestureRecognizer:
             
             scores[digit] = score
             if self.debug:
-                print(f"[Debug] Digit {digit}: score={score:.2f}, matched_features={matched_features}")
+                print(f"\n[Debug] --- Digit {digit} Analysis ---")
+                print(f"[Debug]   Final score: {score:.2f}")
+                print(f"[Debug]   Matched features: {matched_features}")
+                # Show detailed feature matching
+                digit_rules = self.digit_features.get(digit, {})
+                for feature_name, (min_val, max_val) in digit_rules.items():
+                    if feature_name in features:
+                        value = features[feature_name]
+                        if min_val <= value <= max_val:
+                            print(f"[Debug]   ✓ {feature_name}: {value:.4f} (expected {min_val:.2f}-{max_val:.2f}) MATCH")
+                        else:
+                            if value < min_val:
+                                penalty = abs(value - min_val) / (min_val + 1) * 0.5
+                                print(f"[Debug]   ✗ {feature_name}: {value:.4f} (expected {min_val:.2f}-{max_val:.2f}) TOO LOW, penalty: {penalty:.4f}")
+                            else:
+                                penalty = abs(value - max_val) / (max_val + 1) * 0.5
+                                print(f"[Debug]   ✗ {feature_name}: {value:.4f} (expected {min_val:.2f}-{max_val:.2f}) TOO HIGH, penalty: {penalty:.4f}")
+                    else:
+                        print(f"[Debug]   ? {feature_name}: NOT AVAILABLE (expected {min_val:.2f}-{max_val:.2f})")
         
         # Find best match
         if scores:
@@ -487,18 +545,30 @@ class EnhancedGestureRecognizer:
             second_best_score = sorted(scores.values(), reverse=True)[1] if len(scores) > 1 else 0
             
             if self.debug:
-                print(f"[Debug] Best feature match: digit {best_digit} with score {best_score:.2f}")
-                print(f"[Debug] Second best score: {second_best_score:.2f}")
+                print(f"\n[Debug] ========== FEATURE-BASED RESULTS ==========")
+                print(f"[Debug] All digit scores:")
+                for d in sorted(scores.keys()):
+                    marker = " <-- BEST" if d == best_digit else " <-- SECOND" if scores[d] == second_best_score else ""
+                    print(f"[Debug]   Digit {d}: {scores[d]:.4f}{marker}")
+                print(f"[Debug] Best: digit {best_digit} with score {best_score:.2f}")
+                print(f"[Debug] Second best: {second_best_score:.2f}")
+                score_difference = best_score - second_best_score
+                print(f"[Debug] Score difference: {score_difference:.2f}")
+                print(f"[Debug] Threshold check: score > 1.5? {best_score > 1.5}, difference > 0.5? {score_difference > 0.5}")
+                print(f"[Debug] ===========================================\n")
             
             # Higher confidence threshold - need at least 1.5 points AND clear winner
             # Also require that best is significantly better than second best
             score_difference = best_score - second_best_score
             if best_score > 1.5 and score_difference > 0.5:
                 if self.debug:
-                    print(f"[Debug] Using feature-based match: digit {best_digit}")
+                    print(f"[Debug] ✓ ACCEPTED: Using feature-based match: digit {best_digit}")
                 return best_digit
             elif self.debug:
-                print(f"[Debug] Feature match rejected (score {best_score:.2f} too low or too close to second)")
+                if best_score <= 1.5:
+                    print(f"[Debug] ✗ REJECTED: Best score {best_score:.2f} <= 1.5 (too low)")
+                if score_difference <= 0.5:
+                    print(f"[Debug] ✗ REJECTED: Score difference {score_difference:.2f} <= 0.5 (too close to second best)")
         
         if self.debug:
             print("[Debug] No confident match found, returning None")
