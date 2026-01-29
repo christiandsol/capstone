@@ -28,7 +28,7 @@ function Lobby({ onStart }: LobbyProps) {
         left: 0,
         background: "linear-gradient(180deg, #1f1f1f, #0a0a0a)",
         color: "white",
-        fontFamily: "'Lobster', cursive",
+        fontFamily: "'Creepster', cursive",
         textAlign: "center",
         padding: "20px",
         boxSizing: "border-box",
