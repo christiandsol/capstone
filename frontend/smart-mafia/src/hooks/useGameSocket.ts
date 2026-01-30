@@ -16,6 +16,7 @@ export const useGameSocket = (
     const [role, setRole] = useState<string | null>(null);
 
     useEffect(() => {
+        // if (gameSocketRef.current) return;
         const wsUrl = `ws://${API_CONFIG.GAME_SERVER_HOST}:${API_CONFIG.GAME_SERVER_PORT}`;
         console.log('[Game] Connecting to:', wsUrl);
 
@@ -63,6 +64,7 @@ export const useGameSocket = (
 
             gameSocketRef.current.onclose = () => {
                 console.log('[Game] Disconnected from game server');
+                gameSocketRef.current = null;
                 onStatusChange('Disconnected from game server');
             };
         } catch (error) {
