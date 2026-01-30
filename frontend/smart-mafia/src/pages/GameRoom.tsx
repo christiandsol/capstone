@@ -9,13 +9,18 @@ import { VoiceControls } from '../components/VoiceControls';
 import { VideoControls } from '../components/VideoControls';
 import { RemoteVideo } from '../components/RemoteVideo';
 
-export default function GameRoom() {
+type GameProps = {
+  playerName: string;
+};
+
+
+export default function GameRoom({ playerName }: GameProps) {
   const [status, setStatus] = useState("Click 'Start' to begin");
   const [headPosition, setHeadPosition] = useState("unknown");
   const [isStarted, setIsStarted] = useState(false);
 
   // Game server connection
-  const { playerId, role, sendHeadPosition, sendVoiceCommand } = useGameSocket(setStatus);
+  const { role, sendHeadPosition, sendVoiceCommand } = useGameSocket(setStatus, playerName);
 
   // Voice recognition
   const { isListening, start: startVoice, stop: stopVoice } = useVoiceRecognition(
@@ -50,7 +55,7 @@ export default function GameRoom() {
     <div style={{ padding: "20px", fontFamily: "system-ui, sans-serif", background: "#1a1a1a", minHeight: "100vh", color: "white" }}>
       <StatusDisplay
         status={status}
-        playerId={playerId}
+        playerId={playerName}
         role={role}
         headPosition={headPosition}
         isListening={isListening}

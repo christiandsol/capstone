@@ -3,7 +3,8 @@ import json
 from typing import Optional
 from typing import Dict
 from typing import Union
-from websockets.server import WebSocketServerProtocol
+from websockets.legacy.server import WebSocketServerProtocol
+from websockets.typing import Data
 
 
 # Number to body attribute mappings
@@ -21,7 +22,7 @@ async def send_json(ws: WebSocketServerProtocol, player_id: int, action: str, ta
     await ws.send(json.dumps(data))
 
 
-def parse_json(message: str): ## new parse_json
+def parse_json(message: Data): ## new parse_json
     try:
         parsed = json.loads(message)
         print(parsed)

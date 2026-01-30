@@ -1,18 +1,19 @@
-import { useEffect, useState } from "react";
-import { io, Socket } from "socket.io-client";
-import Game from "./GameRoom";
+import { useState } from "react";
 
-const socket: Socket = io("http://163.192.0.247", {
-  transports: ["websocket"],
-});
+import Game from "./GameRoom";
+//
+// const socket: Socket = io("http://163.192.0.247", {
+//   transports: ["websocket"],
+// });
 
 type LobbyProps = {
   onStart: () => void;
   players: string[];
+  playerName: string | null;
+  setName: (playerName: string) => void;
 };
 
-function Lobby({ onStart }: LobbyProps) {
-  const [name, setName] = useState("");
+function Lobby({ onStart, playerName, setName }: LobbyProps) {
 
   return (
     <div
@@ -61,9 +62,11 @@ function Lobby({ onStart }: LobbyProps) {
         <input
           type="text"
           placeholder="Enter your name here"
-          value={name}
+          value={playerName}
           onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && onStart()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onStart();
+          }}
           style={{
             width: "100%",
             padding: "15px",
@@ -101,7 +104,7 @@ function Lobby({ onStart }: LobbyProps) {
         </button>
       </div>
 
-      
+
 
     </div>
   );
@@ -110,36 +113,46 @@ function Lobby({ onStart }: LobbyProps) {
 export default function App() {
   const [page, setPage] = useState<"lobby" | "game">("lobby");
   const [players, setPlayers] = useState<string[]>([]);
+  const [playerName, setName] = useState<string>("");
 
-  useEffect(() => {
-    socket.on("connect", () => {
-      console.log("[Lobby] Connected to signaling server:", socket.id);
-    });
 
-    socket.on("lobby_state", (playersFromServer: string[]) => {
-      console.log("[Lobby] lobby_state:", playersFromServer);
-      setPlayers(playersFromServer);
-    });
-
-    socket.on("disconnect", () => {
-      console.log("[Lobby] Disconnected from signaling server");
-    });
-
-    return () => {
-      socket.off("lobby_state");
-    };
-  }, []);
+  // useEffect(() => {
+  //   socket.on("connect", () => {
+  //     console.log("[Lobby] Connected to signaling server:", socket.id);
+  //   });
+  //
+  //   socket.on("lobby_state", (playersFromServer: string[]) => {
+  //     console.log("[Lobby] lobby_state:", playersFromServer);
+  //     setPlayers(playersFromServer);
+  //   });
+  //
+  //   socket.on("disconnect", () => {
+  //     console.log("[Lobby] Disconnected from signaling server");
+  //   });
+  //
+  //   return () => {
+  //     socket.off("lobby_state");
+  //   };
+  // }, []);
 
   return (
     <div style={{ padding: 20 }}>
-      {page === "lobby" && (
+      {(page == "lobby") && (
         <Lobby
-          onStart={() => setPage("game")}
+          onStart={() => {
+            if (playerName !== "") {
+              setPage("game");
+            }
+          }}
           players={players}
+          playerName={playerName}
+          setName={setName}
         />
       )}
 
-      {page === "game" && <Game />}
+      {page === "game" && <Game
+        playerName={playerName}
+      />}
     </div>
   );
 }

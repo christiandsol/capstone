@@ -1,6 +1,6 @@
 interface StatusDisplayProps {
   status: string;
-  playerId: number | null;
+  playerName: string;
   role: string | null;
   headPosition: string;
   isListening: boolean;
@@ -8,7 +8,7 @@ interface StatusDisplayProps {
 
 export const StatusDisplay: React.FC<StatusDisplayProps> = ({
   status,
-  playerId,
+  playerName,
   role,
   headPosition,
   isListening
@@ -20,9 +20,9 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
         Env: {import.meta.env.MODE}
       </div>
 
-      {playerId && (
+      {playerName && (
         <div style={{ marginTop: '10px', color: '#00aaff' }}>
-          <strong>Player ID:</strong> {playerId} | <strong>Role:</strong> {role ? role.toUpperCase() : 'waiting...'}
+          <strong>Player ID:</strong> {playerName} | <strong>Role:</strong> {role ? role.toUpperCase() : 'waiting...'}
         </div>
       )}
 
