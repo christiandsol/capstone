@@ -416,7 +416,10 @@ class GyroGestureRecognizer:
             print(f"\n[Debug] ========== RECOGNITION ANALYSIS ==========")
             print(f"[Debug] Extracted features:")
             for feat_name, feat_value in features.items():
-                print(f"[Debug]   {feat_name}: {feat_value:.4f}")
+                if isinstance(feat_value, (int, float)):
+                    print(f"[Debug]   {feat_name}: {feat_value:.4f}")
+                else:
+                    print(f"[Debug]   {feat_name}: {feat_value}")
             print(f"[Debug] ===========================================\n")
         
         # Try template matching first (if templates exist)
