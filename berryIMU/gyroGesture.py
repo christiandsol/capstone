@@ -564,19 +564,19 @@ class GyroGestureRecognizer:
                 print(f"[Debug] Second best: {second_best_score:.2f}")
                 score_difference = best_score - second_best_score
                 print(f"[Debug] Score difference: {score_difference:.2f}")
-                print(f"[Debug] Threshold check: score > 1.5? {best_score > 1.5}, difference > 0.5? {score_difference > 0.5}")
+                print(f"[Debug] Threshold check: score > 1.0? {best_score > 1.0}, difference > 0.5? {score_difference > 0.5}")
                 print(f"[Debug] ===========================================\n")
             
-            # Higher confidence threshold - need at least 1.5 points AND clear winner
+            # Confidence threshold - need at least 1.0 points AND clear winner
             # Also require that best is significantly better than second best
             score_difference = best_score - second_best_score
-            if best_score > 1.5 and score_difference > 0.5:
+            if best_score > 1.0 and score_difference > 0.5:
                 if self.debug:
                     print(f"[Debug] ✓ ACCEPTED: Using feature-based match: digit {best_digit}")
                 return best_digit
             elif self.debug:
-                if best_score <= 1.5:
-                    print(f"[Debug] ✗ REJECTED: Best score {best_score:.2f} <= 1.5 (too low)")
+                if best_score <= 1.0:
+                    print(f"[Debug] ✗ REJECTED: Best score {best_score:.2f} <= 1.0 (too low)")
                 if score_difference <= 0.5:
                     print(f"[Debug] ✗ REJECTED: Score difference {score_difference:.2f} <= 0.5 (too close to second best)")
         
