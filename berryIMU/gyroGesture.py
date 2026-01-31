@@ -87,8 +87,9 @@ class BerryIMUInterface:
 
 class GyroTrajectoryTracker:
     """
-    Tracks the 3D rotation trajectory of the gesture by integrating gyroscope data.
-    Uses angular velocity (deg/s) to compute rotation angles (degrees).
+    Tracks the 2D rotation pattern from gyroscope data for flat-surface tracing.
+    Uses raw gyroscope values directly - no integration needed.
+    For flat table tracing, Z-axis (yaw) is primary, X/Y are secondary.
     """
     
     def __init__(self):
@@ -96,24 +97,23 @@ class GyroTrajectoryTracker:
     
     def reset(self):
         """Reset trajectory state."""
-        # Rotation angles in degrees (integrated from angular velocity)
-        self.rotation = np.array([0.0, 0.0, 0.0])  # rx, ry, rz (rotation around x, y, z axes)
         self.trajectory = []
     
     def process_samples(self, samples: List[Tuple[float, float, float, float, float, float]], 
                        dt: float = 0.02) -> List[Tuple[float, float, float]]:
         """
-        Process IMU samples to extract rotation trajectory from gyroscope.
+        Process IMU samples to extract rotation pattern from raw gyroscope values.
+        For flat table tracing, we use raw gyro values directly.
         
         Args:
             samples: List of (ax, ay, az, gx, gy, gz) tuples
-            dt: Time step between samples (default 0.02s for 50Hz)
+            dt: Time step between samples (default 0.02s for 50Hz) - not used for raw values
         
         Returns:
-            List of (rx, ry, rz) rotation angles in degrees
+            List of (gx, gy, gz) raw gyroscope values (rotation rates)
         """
         self.reset()
-        rotations = []
+        gyro_pattern = []
         
         # Remove baseline (drift/bias) using first few samples (assuming device is at rest initially)
         if len(samples) >= 3:
@@ -126,115 +126,115 @@ class GyroTrajectoryTracker:
         for sample in samples:
             ax, ay, az, gx, gy, gz = sample
             
-            # Remove baseline (gyroscope bias/drift)
+            # Remove baseline (gyroscope bias/drift) but keep raw rotation rates
+            # These represent the rotation pattern directly
             gx_clean = gx - baseline_gx
             gy_clean = gy - baseline_gy
             gz_clean = gz - baseline_gz
             
-            # Integrate angular velocity to get rotation angle (simple Euler integration)
-            # Angular velocity is typically in deg/s, so multiply by dt to get degrees
-            self.rotation[0] += gx_clean * dt
-            self.rotation[1] += gy_clean * dt
-            self.rotation[2] += gz_clean * dt
-            
-            rotations.append(tuple(self.rotation.copy()))
+            # Use raw gyroscope values directly - they represent the rotation pattern
+            # gz is primary for flat table (yaw rotation)
+            # gx, gy are secondary (roll/pitch if device tilts slightly)
+            gyro_pattern.append((gx_clean, gy_clean, gz_clean))
         
-        return rotations
+        return gyro_pattern
 
 
 class GestureFeatureExtractor:
     """
-    Extracts features from gyroscope-based rotation trajectories to help classify digits 1-8.
+    Extracts features from raw gyroscope rotation patterns for flat-surface tracing.
+    Focuses on Z-axis (yaw) rotation patterns which are primary for 2D table tracing.
     """
     
     @staticmethod
-    def extract_features(rotations: List[Tuple[float, float, float]], 
+    def extract_features(gyro_pattern: List[Tuple[float, float, float]], 
                         samples: List[Tuple[float, float, float, float, float, float]]) -> Dict[str, float]:
         """
-        Extract features from a rotation trajectory.
+        Extract features from raw gyroscope rotation patterns for flat-surface tracing.
+        
+        For flat table tracing:
+        - Z-axis (gz) is primary - rotation around vertical axis (yaw) as you move left/right
+        - X/Y axes are secondary - minimal rotation when device stays flat
         
         Returns a dictionary of features useful for digit classification.
         """
-        if len(rotations) < 3:
+        if len(gyro_pattern) < 3:
             return {}
         
         features = {}
         
         # Convert to numpy arrays for easier computation
-        rot_array = np.array(rotations)
-        gyro_data = np.array([[s[3], s[4], s[5]] for s in samples])
-        accel_data = np.array([[s[0], s[1], s[2]] for s in samples])
+        gyro_array = np.array(gyro_pattern)  # Shape: (n_samples, 3) - (gx, gy, gz)
+        gx_values = gyro_array[:, 0]
+        gy_values = gyro_array[:, 1]
+        gz_values = gyro_array[:, 2]  # Primary axis for flat table tracing
         
-        # 1. Number of direction changes (sharp rotation changes)
-        direction_changes = 0
-        if len(rot_array) > 2:
-            for i in range(1, len(rot_array) - 1):
-                v1 = rot_array[i] - rot_array[i-1]
-                v2 = rot_array[i+1] - rot_array[i]
-                if np.linalg.norm(v1) > 0.1 and np.linalg.norm(v2) > 0.1:
-                    cos_angle = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
-                    cos_angle = np.clip(cos_angle, -1.0, 1.0)
-                    angle = math.acos(cos_angle)
-                    if angle > math.pi / 3:  # More than 60 degrees
-                        direction_changes += 1
-        features['direction_changes'] = direction_changes
+        # 1. Z-axis rotation direction changes (zero crossings) - primary for 2D tracing
+        # This detects when rotation direction changes (left vs right)
+        z_zero_crossings = 0
+        if len(gz_values) > 1:
+            for i in range(1, len(gz_values)):
+                if (gz_values[i-1] > 0 and gz_values[i] < 0) or (gz_values[i-1] < 0 and gz_values[i] > 0):
+                    z_zero_crossings += 1
+        features['z_zero_crossings'] = z_zero_crossings
         
-        # 2. Total rotation path length
-        path_length = 0.0
-        for i in range(1, len(rot_array)):
-            path_length += np.linalg.norm(rot_array[i] - rot_array[i-1])
-        features['path_length'] = path_length
+        # 2. Total Z-axis rotation magnitude (sum of absolute values)
+        # Measures total rotation activity in the primary axis
+        total_z_rotation = np.sum(np.abs(gz_values))
+        features['total_z_rotation'] = total_z_rotation
         
-        # 3. Straightness (ratio of straight-line rotation to total rotation path)
-        if path_length > 0:
-            straight_dist = np.linalg.norm(rot_array[-1] - rot_array[0])
-            features['straightness'] = straight_dist / path_length
+        # 3. Z-axis rotation range (max - min)
+        z_range = np.max(gz_values) - np.min(gz_values)
+        features['z_rotation_range'] = z_range
+        
+        # 4. Number of peaks in Z-axis rotation (indicates strokes/direction changes)
+        if len(gz_values) > 3:
+            threshold = np.mean(np.abs(gz_values)) + 0.5 * np.std(np.abs(gz_values))
+            peaks = sum(1 for i in range(1, len(gz_values) - 1) 
+                       if abs(gz_values[i]) > threshold and 
+                       abs(gz_values[i]) > abs(gz_values[i-1]) and 
+                       abs(gz_values[i]) > abs(gz_values[i+1]))
+            features['z_rotation_peaks'] = peaks
         else:
-            features['straightness'] = 0.0
+            features['z_rotation_peaks'] = 0
         
-        # 4. Loop detection (for digits like 6, 8, 0)
-        # Check if rotation trajectory returns close to start
-        if len(rot_array) > 10:
-            start_rot = rot_array[0]
-            min_dist_to_start = float('inf')
-            for i in range(len(rot_array) // 2, len(rot_array)):
-                dist = np.linalg.norm(rot_array[i] - start_rot)
-                min_dist_to_start = min(min_dist_to_start, dist)
-            features['loop_score'] = 1.0 / (1.0 + min_dist_to_start)  # Higher if returns close to start
+        # 5. Z-axis rotation smoothness (standard deviation of rotation rate)
+        # Lower = smoother, higher = more jerky
+        features['z_rotation_smoothness'] = np.std(gz_values)
+        
+        # 6. Dominant rotation direction (positive vs negative Z rotation)
+        # Positive = clockwise, Negative = counter-clockwise
+        positive_z = np.sum(gz_values[gz_values > 0])
+        negative_z = abs(np.sum(gz_values[gz_values < 0]))
+        if positive_z + negative_z > 0:
+            features['z_rotation_direction'] = positive_z / (positive_z + negative_z)  # 0-1, higher = more clockwise
+        else:
+            features['z_rotation_direction'] = 0.5
+        
+        # 7. X/Y rotation magnitude (should be minimal for flat table)
+        # If high, device might be tilting
+        xy_magnitude = np.mean(np.linalg.norm(gyro_array[:, :2], axis=1))
+        features['xy_rotation'] = xy_magnitude
+        
+        # 8. Loop detection using Z-axis pattern
+        # For digits like 6, 8 - check if Z rotation pattern repeats
+        if len(gz_values) > 20:
+            # Check if second half of pattern is similar to first half
+            mid = len(gz_values) // 2
+            first_half = gz_values[:mid]
+            second_half = gz_values[mid:]
+            # Simple correlation: if patterns are similar, it's a loop
+            if len(first_half) == len(second_half):
+                correlation = np.corrcoef(first_half, second_half)[0, 1]
+                features['loop_score'] = max(0, correlation) if not np.isnan(correlation) else 0.0
+            else:
+                features['loop_score'] = 0.0
         else:
             features['loop_score'] = 0.0
         
-        # 5. Dominant rotation axis (which axis has most rotation)
-        ranges = {
-            'x': np.max(rot_array[:, 0]) - np.min(rot_array[:, 0]),
-            'y': np.max(rot_array[:, 1]) - np.min(rot_array[:, 1]),
-            'z': np.max(rot_array[:, 2]) - np.min(rot_array[:, 2])
-        }
-        features['dominant_axis'] = max(ranges, key=ranges.get)
-        
-        # 6. Average gyroscope rotation magnitude
-        gyro_magnitude = np.mean(np.linalg.norm(gyro_data, axis=1))
-        features['gyro_rotation'] = gyro_magnitude
-        
-        # 7. Number of peaks in gyroscope magnitude (indicates rotation strokes)
-        gyro_magnitude = np.linalg.norm(gyro_data, axis=1)
-        if len(gyro_magnitude) > 3:
-            threshold = np.mean(gyro_magnitude) + 0.5 * np.std(gyro_magnitude)
-            peaks = sum(1 for i in range(1, len(gyro_magnitude) - 1) 
-                       if gyro_magnitude[i] > threshold and 
-                       gyro_magnitude[i] > gyro_magnitude[i-1] and 
-                       gyro_magnitude[i] > gyro_magnitude[i+1])
-            features['gyro_peaks'] = peaks
-        else:
-            features['gyro_peaks'] = 0
-        
-        # 8. Vertical vs horizontal rotation ratio
-        vertical_range = np.max(rot_array[:, 1]) - np.min(rot_array[:, 1])  # Y-axis rotation
-        horizontal_range = np.max(rot_array[:, 0]) - np.min(rot_array[:, 0])  # X-axis rotation
-        if horizontal_range > 0:
-            features['vertical_horizontal_ratio'] = vertical_range / horizontal_range
-        else:
-            features['vertical_horizontal_ratio'] = 100.0 if vertical_range > 0 else 0.0
+        # 9. Total path complexity (sum of all rotation magnitudes)
+        total_rotation = np.sum(np.linalg.norm(gyro_array, axis=1))
+        features['total_rotation'] = total_rotation
         
         return features
 
@@ -316,17 +316,26 @@ class GyroGestureRecognizer:
         # Load existing templates from file (if they exist)
         self.load_templates()
         
-        # Feature-based classification rules (heuristic approach)
-        # These can be refined with actual data
+        # Feature-based classification rules for flat-surface tracing
+        # Based on Z-axis rotation patterns (primary) and X/Y rotation (secondary)
+        # These will need tuning with actual data
         self.digit_features = {
-            1: {'direction_changes': (0, 1), 'straightness': (0.8, 1.0), 'vertical_horizontal_ratio': (1.5, 100), 'gyro_peaks': (0, 15)},
-            2: {'direction_changes': (1, 3), 'straightness': (0.3, 0.8), 'vertical_horizontal_ratio': (0.3, 1.5)},
-            3: {'direction_changes': (0, 4), 'straightness': (0.2, 0.95), 'vertical_horizontal_ratio': (0.5, 3.0), 'gyro_peaks': (5, 25)},
-            4: {'direction_changes': (0, 3), 'straightness': (0.4, 0.75), 'vertical_horizontal_ratio': (0.4, 1.2), 'gyro_peaks': (15, 30)},
-            5: {'direction_changes': (2, 5), 'straightness': (0.2, 0.7), 'vertical_horizontal_ratio': (0.5, 2.0)},
-            6: {'direction_changes': (0, 2), 'loop_score': (0.3, 1.0), 'straightness': (0.0, 0.5)},
-            7: {'direction_changes': (1, 3), 'straightness': (0.4, 0.9), 'vertical_horizontal_ratio': (0.3, 1.5)},
-            8: {'direction_changes': (0, 1), 'loop_score': (0.5, 1.0), 'gyro_rotation': (100, 500), 'path_length': (0.5, 3.0)}
+            # Digit 1: Simple vertical line - mostly one direction, few zero crossings
+            1: {'z_zero_crossings': (0, 2), 'z_rotation_peaks': (0, 3), 'total_z_rotation': (50, 500)},
+            # Digit 2: Curved shape - some direction changes
+            2: {'z_zero_crossings': (1, 4), 'z_rotation_peaks': (2, 6)},
+            # Digit 3: Two curves - more direction changes
+            3: {'z_zero_crossings': (2, 6), 'z_rotation_peaks': (3, 8)},
+            # Digit 4: Multiple strokes with corners - many direction changes
+            4: {'z_zero_crossings': (3, 8), 'z_rotation_peaks': (4, 10)},
+            # Digit 5: Complex shape - many changes
+            5: {'z_zero_crossings': (4, 10), 'z_rotation_peaks': (5, 12)},
+            # Digit 6: Loop at bottom - circular pattern
+            6: {'z_zero_crossings': (2, 6), 'loop_score': (0.2, 1.0), 'z_rotation_peaks': (3, 8)},
+            # Digit 7: Diagonal line with hook - moderate changes
+            7: {'z_zero_crossings': (1, 5), 'z_rotation_peaks': (2, 7)},
+            # Digit 8: Two loops - strong circular pattern
+            8: {'z_zero_crossings': (4, 12), 'loop_score': (0.3, 1.0), 'z_rotation_peaks': (6, 15)}
         }
     
     def load_templates(self):
@@ -376,10 +385,10 @@ class GyroGestureRecognizer:
             return
         
         dt = 0.02  # 50Hz
-        rotations = self.tracker.process_samples(samples, dt)
-        if len(rotations) > 0:
-            rot_array = np.array(rotations)
-            normalized = self.dtw_matcher.normalize_sequence(rot_array)
+        gyro_pattern = self.tracker.process_samples(samples, dt)
+        if len(gyro_pattern) > 0:
+            gyro_array = np.array(gyro_pattern)
+            normalized = self.dtw_matcher.normalize_sequence(gyro_array)
             self.templates[digit].append(normalized)
             # Automatically save templates after adding a new one
             self.save_templates()
@@ -395,22 +404,22 @@ class GyroGestureRecognizer:
         if not samples or len(samples) < 10:
             return None
         
-        # Check minimum movement threshold using gyroscope
-        gyro_magnitudes = [math.sqrt(s[3]**2 + s[4]**2 + s[5]**2) for s in samples]
-        max_gyro = max(gyro_magnitudes)
-        min_gyro = min(gyro_magnitudes)
-        if max_gyro - min_gyro < 50:  # Too little rotation
+        # Check minimum movement threshold using Z-axis gyroscope (primary for flat table)
+        gz_values = [s[5] for s in samples]
+        max_gz = max(gz_values)
+        min_gz = min(gz_values)
+        if abs(max_gz - min_gz) < 30:  # Too little Z-axis rotation
             return None
         
-        # Extract rotation trajectory from gyroscope
+        # Extract raw gyroscope rotation pattern
         dt = 0.02  # 50Hz
-        rotations = self.tracker.process_samples(samples, dt)
+        gyro_pattern = self.tracker.process_samples(samples, dt)
         
-        if len(rotations) < 5:
+        if len(gyro_pattern) < 5:
             return None
         
-        # Extract features
-        features = self.feature_extractor.extract_features(rotations, samples)
+        # Extract features from raw gyro pattern
+        features = self.feature_extractor.extract_features(gyro_pattern, samples)
         
         if self.debug:
             print(f"\n[Debug] ========== RECOGNITION ANALYSIS ==========")
@@ -425,8 +434,8 @@ class GyroGestureRecognizer:
         # Try template matching first (if templates exist)
         template_match_used = False
         if any(len(templates) > 0 for templates in self.templates.values()):
-            rot_array = np.array(rotations)
-            normalized_input = self.dtw_matcher.normalize_sequence(rot_array)
+            gyro_array = np.array(gyro_pattern)
+            normalized_input = self.dtw_matcher.normalize_sequence(gyro_array)
             
             best_match = None
             best_score = float('inf')
