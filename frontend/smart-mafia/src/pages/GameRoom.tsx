@@ -101,7 +101,7 @@ export default function GameRoom({ playerName }: GameProps) {
           </p>
         ) : (
           remoteStreams.map((stream) => (
-            <RemoteVideo key={stream.id} stream={stream} />
+            <RemoteVideo key={stream.id} stream={stream} playerName={playerName} />
           ))
         )}
       </div>

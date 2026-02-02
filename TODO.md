@@ -7,13 +7,10 @@ Add skeleton for play page
 Christian: 
 - [x] Connect to a web server
 - [x] deploy
-- [ ] Make it so that server can be run in local as well, add instructions for doing that
-- Client support:
-    - [x] Pass name into socket function
-    - [x] Send setup signal with playerName
-    - [ ] Push for local
-    - [ ]
-- [ ] server side support for naming conventions
+- Raspberry pi support:
+- How are you going to make the raspberry pi get the proper role and player name?
+    - you need the rpi to connect to the server and wait for a given name
+    - How can I make both the heads up and heads down signal as well as the rpi signal appear as one?
 
 Selena:
 - [ ] start website frontend, hosted locally, build skeleton of home page

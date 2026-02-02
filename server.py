@@ -30,7 +30,7 @@ class MafiaGame:
     def check_everyone_in_game(self):
         return len(self.players) == self.player_cap and all(p["setup"] for p in self.players.values())
 
-    def check_heads_down(self, allowed: List[str]):
+    def check_heads_down(self, allowed: List[str | None]):
         for name, data in self.players.items():
             if data["alive"] and data["head"] == "up" and name not in allowed:
                 return False
@@ -155,6 +155,9 @@ async def handler(ws: WebSocketServerProtocol):
             # Handle setup message
             if msg.get("action") == "setup":
                 player_name = msg.get("target")
+                if player_name == "rpi":
+                    print(f"[DEBUG] server adding rpi: {player_name}")
+                    continue
                 print(f"[DEBUG] server adding player: {player_name}")
                 
                 # Move lock inside the loop, not outside

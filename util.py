@@ -13,9 +13,9 @@ CHIN = 152
 FOREHEAD = 10
 
 
-async def send_json(ws: WebSocketServerProtocol, player_id: int, action: str, target): ## new sendjson
+async def send_json(ws: WebSocketServerProtocol, playerName: str, action: str, target): ## new sendjson
     data = {
-        "player": player_id,
+        "player": playerName,
         "action": action,
         "target": target
     }

@@ -4,6 +4,8 @@ import { Server } from "socket.io";
 
 const app = express();
 
+app.use(express.json())
+
 app.use(express.static('public', {
   setHeaders: (res) => {
     res.set('Access-Control-Allow-Origin', '*');
@@ -14,7 +16,7 @@ app.use(express.static('public', {
 const server = http.createServer(app);
 
 const io = new Server(server, {
-  cors: { 
+  cors: {
     origin: "*",
     methods: ["GET", "POST"],
     credentials: true
@@ -22,22 +24,25 @@ const io = new Server(server, {
   transports: ['websocket', 'polling']
 });
 
+
+// ======= DEFINING METHODS ======
+
 io.on("connection", socket => {
   console.log("Connected:", socket.id);
-  
+
   socket.on("join-room", room => {
     socket.join(room);
     socket.to(room).emit("user-joined", socket.id);
     console.log(`Socket ${socket.id} joined room: ${room}`);
   });
-  
+
   socket.on("signal", ({ to, data }) => {
     io.to(to).emit("signal", {
       from: socket.id,
       data
     });
   });
-  
+
   socket.on("disconnect", () => {
     console.log("Disconnected:", socket.id);
   });

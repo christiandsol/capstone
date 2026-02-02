@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import Game from "./GameRoom";
+import Rpi from "./Rpi";
 //
 // const socket: Socket = io("http://163.192.0.247", {
 //   transports: ["websocket"],
@@ -111,7 +112,7 @@ function Lobby({ onStart, playerName, setName }: LobbyProps) {
 }
 
 export default function App() {
-  const [page, setPage] = useState<"lobby" | "game">("lobby");
+  const [page, setPage] = useState<"lobby" | "rpi">("lobby");
   const [players, setPlayers] = useState<string[]>([]);
   const [playerName, setName] = useState<string>("");
 
@@ -141,7 +142,7 @@ export default function App() {
         <Lobby
           onStart={() => {
             if (playerName !== "") {
-              setPage("game");
+              setPage("rpi");
             }
           }}
           players={players}
@@ -150,7 +151,7 @@ export default function App() {
         />
       )}
 
-      {page === "game" && <Game
+      {page === "rpi" && <Rpi
         playerName={playerName}
       />}
     </div>
