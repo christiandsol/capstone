@@ -36,6 +36,7 @@ class MafiaGame:
 
     def check_heads_down(self, allowed: List[str | None]):
         for name, data in self.players.items():
+            print(f"[DEBUG] Checking player {name}'s head state: {data['head']}")
             if data["alive"] and data["head"] == "up" and name not in allowed:
                 return False
         return True
@@ -223,7 +224,7 @@ async def handler(ws: WebSocketServerProtocol):
                     game.clients[ws] = player_name
                     game.players[player_name] = {
                         "setup": True,
-                        "head": None,
+                        "head": "up",
                         "vote": None,
                         "kill": None,
                         "save": None,

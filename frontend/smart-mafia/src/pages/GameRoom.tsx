@@ -45,6 +45,7 @@ export default function GameRoom({ playerName }: GameProps) {
   const handleStart = async (useTestVideos: boolean) => {
     if (useTestVideos) {
       setHeadPosition("headDown")
+      sendHeadPosition("headDown")
       await startTestVideo();
     } else {
       await startCamera();
