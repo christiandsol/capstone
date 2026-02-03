@@ -1,6 +1,5 @@
 import socket
 import json
-from typing import Optional
 from typing import Dict
 from typing import Union
 from websockets.legacy.server import WebSocketServerProtocol
@@ -13,13 +12,15 @@ CHIN = 152
 FOREHEAD = 10
 
 
-async def send_json(ws: WebSocketServerProtocol, playerName: str, action: str, target): ## new sendjson
+async def send_json(ws: WebSocketServerProtocol, playerName: Union[str, int], action: str, target): ## new sendjson
     data = {
         "player": playerName,
         "action": action,
         "target": target
     }
     await ws.send(json.dumps(data))
+
+
 
 
 def parse_json(message: Data): ## new parse_json

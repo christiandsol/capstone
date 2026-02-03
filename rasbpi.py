@@ -52,6 +52,21 @@ async def send_signal_to_server(ws, action, target):
 
 
 
+async def handle_debug_vote(ws):
+    while True:
+        print("\n[Pi] Ready to record vote. Go ahead and vote for a player")
+        print("[Pi] Press Enter to start recording, or 'q' to quit: ", end='')
+        vote = input().strip().lower()
+        if not vote.isnumeric():
+            print("[Pi] Vote not numeric, try again", end='')
+            continue
+        action = "targeted"
+        target = vote
+
+        print(f"[Pi] Sending vote for player {vote}...")
+        await send_signal_to_server(ws, action, vote)
+        break
+
 async def handle_vote(ws, imu, recognizer):
     """
     Handles the voting
@@ -102,7 +117,8 @@ async def handle_vote(ws, imu, recognizer):
         
         print(f"[Pi] Sending vote for player {digit}...")
         await send_signal_to_server(ws, action, target)
-        time.sleep(0.1)  # optional, gives a tiny delay between sends
+        time.sleep(0.1)
+        break
 
 
 async def rpi_helper(ws,name,imu, recognizer):
@@ -111,8 +127,20 @@ async def rpi_helper(ws,name,imu, recognizer):
             msg = parse_json(message)
             if not msg:
                 continue
+            action = msg.get("action")
+            if action in ["civilian", "mafia", "doctor"]:
+                global role
+                role = action
+                print(f"[DEBUG] received role: {action}")
+                continue
+        
             # server tells us it's our turn to vote
-            await handle_vote(ws, imu, recognizer)
+            print("[Pi] Are you running on your raspberry(y for raspberry pi, n for local debugging)", end='')
+            cmd = input().strip().lower()
+            if cmd == 'y':
+                await handle_vote(ws, imu, recognizer)
+            else:
+                await handle_debug_vote(ws)
     except websockets.exceptions.ConnectionClosedError:
         print(f"[DEBUG] Connection closed unexpectedly")
     except Exception as e:

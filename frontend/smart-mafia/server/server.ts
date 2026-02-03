@@ -27,6 +27,8 @@ const io = new Server(server, {
 
 // ======= DEFINING METHODS ======
 
+
+
 io.on("connection", socket => {
   console.log("Connected:", socket.id);
 

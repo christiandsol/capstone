@@ -49,7 +49,7 @@ export const useGameSocket = (
                     const data = JSON.parse(event.data);
                     console.log('[Game] Received:', data);
 
-                    if (data.action === 'player_registered') {
+                    if (data.action === 'id_registered') {
                         console.log(`[Game] Player registered: ${data.player}`);
                         onStatusChange(`Registered as ${data.player}. Waiting for role...`);
                     }

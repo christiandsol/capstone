@@ -44,6 +44,7 @@ export default function GameRoom({ playerName }: GameProps) {
 
   const handleStart = async (useTestVideos: boolean) => {
     if (useTestVideos) {
+      setHeadPosition("headDown")
       await startTestVideo();
     } else {
       await startCamera();
@@ -55,7 +56,7 @@ export default function GameRoom({ playerName }: GameProps) {
     <div style={{ padding: "20px", fontFamily: "system-ui, sans-serif", background: "#1a1a1a", minHeight: "100vh", color: "white" }}>
       <StatusDisplay
         status={status}
-        playerId={playerName}
+        playerName={playerName}
         role={role}
         headPosition={headPosition}
         isListening={isListening}
@@ -101,7 +102,7 @@ export default function GameRoom({ playerName }: GameProps) {
           </p>
         ) : (
           remoteStreams.map((stream) => (
-            <RemoteVideo key={stream.id} stream={stream} playerName={playerName} />
+            <RemoteVideo key={stream.id} stream={stream} />
           ))
         )}
       </div>

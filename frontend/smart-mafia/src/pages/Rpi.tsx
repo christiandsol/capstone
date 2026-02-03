@@ -10,6 +10,8 @@ const RPI_PORT = 8000;
 
 const connectRpi = async (ip_addr: string, playerName: string): Promissee<bool> => {
   console.log(`player name: ${playerName}`)
+  // const resolvedIp = ip_addr;
+  // NOTE: HERE uncomment the resolved IP line if you don't want to use raspberry pi and you are debugging
   const resolvedIp = import.meta.env.DEV
     ? "127.0.0.1"
     : ip_addr;
