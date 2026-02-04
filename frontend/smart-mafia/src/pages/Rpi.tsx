@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { API_CONFIG } from '../config/api.config';
+// import { API_CONFIG } from '../config/api.config';
 import GameRoom from './GameRoom';
 
 type RpiProps = {
@@ -8,7 +8,7 @@ type RpiProps = {
 
 const RPI_PORT = 8000;
 
-const connectRpi = async (ip_addr: string, playerName: string): Promissee<bool> => {
+const connectRpi = async (ip_addr: string, playerName: string): Promise<boolean> => {
   console.log(`player name: ${playerName}`)
   // const resolvedIp = ip_addr;
   // NOTE: HERE uncomment the resolved IP line if you don't want to use raspberry pi and you are debugging
@@ -34,7 +34,7 @@ const connectRpi = async (ip_addr: string, playerName: string): Promissee<bool> 
   return false
 };
 
-export default function Rpi({ playerName }) {
+export default function Rpi({ playerName }: RpiProps) {
   const [ip_addr, setIP] = useState<string>("");
   const [page, setPage] = useState<string>("rpi");
   return (
