@@ -21,7 +21,6 @@ Kirt:
 - [x] Finish game logic for more players
 - [ ] Add skeleton for play page
 - [ ] Finish play page by integrating play data onto page
-- [ ] Voice recognition
 
 Christian: 
 - [x] Connect to a web server
