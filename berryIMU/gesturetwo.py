@@ -30,8 +30,8 @@ Directions:
 - 4: Left
 - 5: Up-Left (diagonal)
 - 6: Up-Right (diagonal)
-- 7: Down-Left (diagonal)
-- 8: Down-Right (diagonal)
+- 7: Down-Right (diagonal)
+- 8: Down-Left (diagonal)
 
 This file is written as a guided template:
 - The network / vote sending logic is implemented.
@@ -229,11 +229,11 @@ class GestureRecognizer:
             
             # Down-Right: ay negative, ax positive
             elif delta_ay < -diagonal_threshold and delta_ax > diagonal_threshold:
-                return 8
+                return 7
             
             # Down-Left: both negative
             elif delta_ay < -diagonal_threshold and delta_ax < -diagonal_threshold:
-                return 7
+                return 8
 
         # If not diagonal, check for cardinal directions
         # Dominant vertical movement (up/down)
@@ -340,7 +340,7 @@ class GestureVotingClient:
         print("=== Gesture Voting Client (Digits 1-8) ===")
         print(f"Player ID: {self.player_id}")
         print("When it's time to vote, draw a gesture (digit 1–8) with the BerryIMU.")
-        print("Directions: 1=Up, 2=Right, 3=Down, 4=Left, 5=Up-Left, 6=Up-Right, 7=Down-Left, 8=Down-Right")
+        print("Directions: 1=Up, 2=Right, 3=Down, 4=Left, 5=Up-Left, 6=Up-Right, 7=Down-Right, 8=Down-Left")
         print("Press Enter to record a gesture, or 'q' + Enter to quit.")
 
         while True:
