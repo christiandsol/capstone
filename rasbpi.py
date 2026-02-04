@@ -11,7 +11,7 @@ import sys
 import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'berryIMU'))
-from gesture import BerryIMUInterface, GestureRecognizer
+from gesturetwo import BerryIMUInterface, GestureRecognizer
 
 SERVER_IP = "172.16.12.134"
 SERVER_PORT = 5050
@@ -73,7 +73,7 @@ async def handle_vote(ws, imu, recognizer):
     """
     global name
     while True:
-        print("\n[Pi] Ready to record gesture. Move the BerryIMU to vote (1-4)...")
+        print("\n[Pi] Ready to record gesture. Move the BerryIMU to vote (1-8)...")
         print("[Pi] Press Enter to start recording, or 'q' to quit: ", end='')
         cmd = input().strip().lower()
         
@@ -99,8 +99,8 @@ async def handle_vote(ws, imu, recognizer):
             print("[Pi] Could not recognize gesture. Try again with a clearer movement.")
             continue
         
-        if digit not in (1, 2, 3, 4):
-            print(f"[Pi] Recognized digit {digit}, but only 1-4 are valid. Ignoring.")
+        if digit not in range(1, 9):
+            print(f"[Pi] Recognized digit {digit}, but only 1-8 are valid. Ignoring.")
             continue
         
         # Ask for confirmation before sending vote
