@@ -13,7 +13,8 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'berryIMU'))
 from gesturetwo import BerryIMUInterface, GestureRecognizer
 
-SERVER_IP = "172.16.12.134"
+# SERVER_IP = "172.22.56.164"
+SERVER_IP = "127.0.0.1"
 SERVER_PORT = 5050
 
 def parse_json(message: Data): ## new parse_json

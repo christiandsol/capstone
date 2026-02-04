@@ -2,7 +2,7 @@ import asyncio
 import json
 import websockets
 
-SERVER_IP = "172.16.12.134"
+SERVER_IP = "127.0.0.1"
 SERVER_PORT = 5050
 
 async def debug_player(player_name):
