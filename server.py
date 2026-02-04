@@ -22,11 +22,15 @@ class MafiaGame:
         self.player_id_to_name: Dict[int, str] = {}  # player_id -> name
         self.name_to_player_id: Dict[str, int] = {}  # name -> player_id
         
-        self.mafia_name = None
-        self.doctor_name = None
+        self.mafia_name_one = None
+        self.mafia_name_two = None
+        self.doctor_name_one = None
+        self.doctor_name_two = None
         
         self.last_killed = None
         self.last_saved = None
+        self.mafia_count = None
+        self.doctor_count = None
 
     def valid_signal(self, signal):
         return signal and signal.get("action") in self.expected_signals
@@ -55,18 +59,36 @@ class MafiaGame:
         return self.name_to_player_id.get(name)
 
     def mafia_kill(self):
-        if self.mafia_name and self.players[self.mafia_name]["kill"]:
-            kill = self.players[self.mafia_name]["kill"]
-            self.players[self.mafia_name]["kill"] = None
-            return kill
-        return None
+        if self.mafia_count == 1:
+            if self.mafia_name_one and self.players[self.mafia_name_one]["kill"]:
+                kill = self.players[self.mafia_name_one]["kill"]
+                self.players[self.mafia_name_one]["kill"] = None
+                return kill
+            return None
+        elif self.mafia_count == 2:
+            if self.mafia_name_one and self.players[self.mafia_name_one]["kill"] and self.mafia_name_two and self.players[self.mafia_name_two]["kill"]:
+                if self.players[self.mafia_name_one]["kill"] == self.players[self.mafia_name_two]["kill"]:
+                    kill = self.players[self.mafia_name_one]["kill"]
+                    self.players[self.mafia_name_one]["kill"] = None
+                    self.players[self.mafia_name_two]["kill"] = None
+                    return kill
+            return None
 
     def doctor_save(self):
-        if self.doctor_name and self.players[self.doctor_name]["save"]:
-            save = self.players[self.doctor_name]["save"]
-            self.players[self.doctor_name]["save"] = None
-            return save
-        return None
+        if self.doctor_count == 1:
+            if self.doctor_name_one and self.players[self.doctor_name_one]["save"]:
+                save = self.players[self.doctor_name_one]["save"]
+                self.players[self.doctor_name_one]["save"] = None
+                return save
+            return None
+        elif self.doctor_count == 2:
+            if self.doctor_name_one and self.players[self.doctor_name_one]["save"] and self.mafia_name_two and self.players[self.doctor_name_two]["save"]:
+                if self.players[self.doctor_name_one]["save"] == self.players[self.doctor_name_two]["save"]:
+                    save = self.players[self.doctor_name_one]["save"]
+                    self.players[self.doctor_name_one]["save"] = None
+                    self.players[self.doctor_name_two]["save"] = None
+                    return save
+            return None
 
     def everyone_voted(self):
         for name, data in self.players.items():
@@ -101,18 +123,34 @@ class MafiaGame:
             await self.request_action(name, "vote")
 
     async def assign_player(self):
-        for ws, name in self.clients.items():
-            role = "civilian"
-            if name == self.mafia_name:
+        if self.mafia_count == 2:
+            for ws, name in self.clients.items():
+                role = "civilian"
+                if name == self.mafia_name_one or name == self.mafia_name_two:
+                    role = "mafia"
+                elif name == self.doctor_name_one or name == self.doctor_name_two:
+                    role = "doctor"
+                await send_json(ws, name, role, None)
+            for name, ws in self.rpis.items():
+                role = "civilian"
+            if name == self.mafia_name_one or name == self.mafia_name_two:
                 role = "mafia"
-            elif name == self.doctor_name:
+            elif name == self.doctor_name_one or name == self.doctor_name_two:
                 role = "doctor"
             await send_json(ws, name, role, None)
-        for name, ws in self.rpis.items():
-            role = "civilian"
-            if name == self.mafia_name:
+        else:
+            for ws, name in self.clients.items():
+                role = "civilian"
+                if name == self.mafia_name_one:
+                    role = "mafia"
+                elif name == self.doctor_name_one:
+                    role = "doctor"
+                await send_json(ws, name, role, None)
+            for name, ws in self.rpis.items():
+                role = "civilian"
+            if name == self.mafia_name_one:
                 role = "mafia"
-            elif name == self.doctor_name:
+            elif name == self.doctor_name_one:
                 role = "doctor"
             await send_json(ws, name, role, None)
 
@@ -122,8 +160,13 @@ class MafiaGame:
             print("All players connected")
             # Assign roles randomly
             player_names = list(self.players.keys())
-            if len(player_names) >= 2:
-                self.mafia_name, self.doctor_name = random.sample(player_names, 2)
+            if len(player_names) >= 7:
+                self.mafia_count = 2
+                self.doctor_count = 2
+                self.mafia_name_one, self.mafia_name_two, self.doctor_name_one, self.doctor_name_two = random.sample(player_names, 4)
+            else:
+                mafia_count = 1
+                self.mafia_name_one, self.doctor_name_one = random.sample(player_names, 2)
             self.state = "ASSIGN"
             self.expected_signals = set()
 
@@ -138,20 +181,38 @@ class MafiaGame:
             self.state = "MAFIAVOTE"
             self.expected_signals = {"headUp", "headDown", "targeted"}
             print("MOVING ON TO MAFIA VOTE STAGE")
-            await self.request_action(self.mafia_name, "kill")
+            if self.mafia_count == 1:
+                await asyncio.wait(
+                    [
+                        self.request_action(self.mafia_name_one, "kill"),
+                        self.request_action(self.mafia_name_two, "kill")
+                    ],
+                    return_when=asyncio.FIRST_COMPLETED
+                )
+            elif self.mafia_count == 2:
+                await asyncio.gather(self.request_action(self.mafia_name_one, "kill"), self.request_action(self.mafia_name_two, "kill"))
 
         if self.state == "MAFIAVOTE":
-            if self.check_heads_down([self.mafia_name]):
+            if self.check_heads_down([self.mafia_name_one, self.mafia_name_two]):
                 kill = self.mafia_kill()
                 if kill:
                     self.last_killed = kill
                     self.players[kill]["alive"] = False
-                    self.state = "DOCTORVOTE" if self.doctor_name else "NARRATE"
+                    self.state = "DOCTORVOTE" if (self.doctor_name_one or self.doctor_name_two) else "NARRATE"
                     if self.state == "DOCTORVOTE":
-                        await self.request_action(self.doctor_name, "save")
+                        if self.doctor_count == 1:
+                            await asyncio.wait(
+                                [
+                                    self.request_action(self.doctor_name_one, "save"),
+                                    self.request_action(self.doctor_name_two, "save")
+                                ],
+                                return_when=asyncio.FIRST_COMPLETED
+                            )
+                        elif self.doctor_count == 2:
+                            await asyncio.gather(self.request_action(self.doctor_name_one, "save"), self.request_action(self.doctor_name_two, "save"))
 
         if self.state == "DOCTORVOTE":
-            if self.check_heads_down([self.doctor_name]):
+            if self.check_heads_down([self.doctor_name_one, self.doctor_name_two]):
                 save = self.doctor_save()
                 if save:
                     self.last_saved = save
@@ -181,7 +242,7 @@ class MafiaGame:
 
 # ------------------ SERVER ------------------
 
-game = MafiaGame(3)
+game = MafiaGame(8)
 lock = asyncio.Lock()
 
 
@@ -264,9 +325,9 @@ async def handler(ws: WebSocketServerProtocol):
                                 print(f"[DEBUG] Invalid player ID received: {msg.get('target')}")
                                 continue
                         
-                        if player_name == game.mafia_name and game.state == "MAFIAVOTE":
+                        if (player_name == game.mafia_name_one or player_name == game.mafia_name_two) and game.state == "MAFIAVOTE":
                             player_data["kill"] = target
-                        elif player_name == game.doctor_name and game.state == "DOCTORVOTE":
+                        elif (player_name == game.doctor_name_one or game.doctor_name_two) and game.state == "DOCTORVOTE":
                             player_data["save"] = target
                         else:
                             player_data["vote"] = target
