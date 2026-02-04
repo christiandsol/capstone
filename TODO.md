@@ -18,8 +18,10 @@
     - just received the role on raspberry pi end, now you can go ahead and send over the role to handle it on the server end
 
 Kirt:
-Finish game logic for more players
-Add skeleton for play page
+- [x] Finish game logic for more players
+- [ ] Add skeleton for play page
+- [ ] Finish play page by integrating play data onto page
+- [ ] Voice recognition
 
 Christian: 
 - [x] Connect to a web server
