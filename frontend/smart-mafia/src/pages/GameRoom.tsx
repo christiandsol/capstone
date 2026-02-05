@@ -18,6 +18,7 @@ export default function GameRoom({ playerName }: GameProps) {
   const [status, setStatus] = useState("Click 'Start' to begin");
   const [headPosition, setHeadPosition] = useState("unknown");
   const [isStarted, setIsStarted] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
 
   // Game server connection
   const { role, playerId, sendHeadPosition, sendVoiceCommand } = useGameSocket(setStatus, playerName);
@@ -42,6 +43,17 @@ export default function GameRoom({ playerName }: GameProps) {
   // WebRTC peer connections
   const { remoteStreams } = useWebRTC(localStream, setStatus, playerName, playerId);
 
+  // Toggle audio mute/unmute
+  const toggleAudio = () => {
+  if (localStream) {
+    localStream.getAudioTracks().forEach((track: MediaStreamTrack) => {
+      track.enabled = !track.enabled;
+    });
+    const newMutedState = !isMuted;
+    setIsMuted(newMutedState);
+    setStatus(newMutedState ? 'Microphone OFF' : 'Microphone ON'); 
+};}
+
   const handleStart = async (useTestVideos: boolean) => {
     if (useTestVideos) {
       setHeadPosition("headDown")
@@ -54,20 +66,40 @@ export default function GameRoom({ playerName }: GameProps) {
   };
 
   return (
-    <div style={{ padding: "20px", fontFamily: "system-ui, sans-serif", background: "#1a1a1a", minHeight: "100vh", color: "white" }}>
-      <StatusDisplay
-        status={status}
-        playerName={playerName}
-        role={role}
-        headPosition={headPosition}
-        isListening={isListening}
-      />
+    <div style={{ padding: "0", fontFamily: "system-ui, sans-serif", background: "#1a1a1a", minHeight: "100vh", color: "white" }}>
+      {/* Game Room Heading */}
+      <div style={{ 
+        textAlign: 'center', 
+        padding: '20px 20px 20px 20px',
+        background: 'linear-gradient(180deg, #2a2a2a, #1a1a1a)',
+      }}>
+        <h1 style={{ 
+          fontSize: '4rem',
+          margin: '0 0 10px 0',
+          color: '#8b0a15',
+          textShadow: '0 0 20px #8b0a15',
+          fontFamily: "'Creepster', cursive",
+        }}>
+          Game Room
+        </h1>
+      </div>
+
+      <div style={{ padding: "20px" }}>
+        <StatusDisplay
+          status={status}
+          playerName={playerName}
+          role={role}
+          headPosition={headPosition}
+          isListening={isListening}
+        />
 
       {isStarted && (
         <VoiceControls
           isListening={isListening}
           onStart={startVoice}
           onStop={stopVoice}
+          isMuted={isMuted}
+          onToggleMute={toggleAudio}
         />
       )}
 
@@ -111,6 +143,7 @@ export default function GameRoom({ playerName }: GameProps) {
             />
           ))
         )}
+      </div>
       </div>
     </div>
   );

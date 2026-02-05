@@ -181,7 +181,7 @@ class MafiaGame:
 
         if self.state == "HEADSDOWN" and self.check_heads_down([]):
             self.state = "MAFIAVOTE"
-            self.expected_signals = {"headUp", "headDown", "targeted"}
+            self.expected_signals = {"headUp", "headDown", "voiceCommand"}
             print("MOVING ON TO MAFIA VOTE STAGE")
             if self.mafia_count == 1:
                 await asyncio.wait(
@@ -227,7 +227,7 @@ class MafiaGame:
                 "saved": self.last_saved
             })
             self.state = "VOTE"
-            self.expected_signals = {"targeted"}
+            self.expected_signals = {"voiceCommand"}
             await self.broadcast_vote()
 
         if self.state == "VOTE" and self.everyone_voted():
@@ -255,6 +255,20 @@ async def handler(ws: WebSocketServerProtocol):
         async for message in ws:
             msg = parse_json(message)
             if not msg:
+                continue
+            
+            # Handle control messages (voice commands from frontend)
+            if msg.get("action") == "control":
+                target = msg.get("target")
+                ctrl_code = None
+                ctrl_name = None
+                
+                if isinstance(target, dict):
+                    ctrl_code = target.get("code")
+                    ctrl_name = target.get("name")
+                
+                print(f"[VOICE_COMMAND] Received: player={player_name}, code={ctrl_code}, action={ctrl_name}")
+                # Server logic can now act on these control actions
                 continue
             
             # Handle setup message
@@ -316,7 +330,7 @@ async def handler(ws: WebSocketServerProtocol):
                         player_data["head"] = "up"
                     elif action == "headDown":
                         player_data["head"] = "down"
-                    elif action == "targeted":
+                    elif action == "voiceCommand":
                         target = msg.get("target")
                         print(f"[DEBUG], recieved target signal with target: {target}, of type: {type(target)}")
 
