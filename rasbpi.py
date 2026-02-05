@@ -9,8 +9,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'berryIMU'))
 from gesturetwo import BerryIMUInterface, GestureRecognizer
 
-SERVER_IP = "mafiacapstone.duckdns.org"
-# SERVER_IP = "127.0.0.1"
+SERVER_IP = "127.0.0.1"
 SERVER_PORT = 5050
 
 def parse_json(message: Data):
@@ -38,7 +37,7 @@ async def handle_debug_vote(ws, name):
         if not vote.isnumeric():
             print("[Pi] Vote not numeric, try again", end='')
             continue
-        action = "targeted"
+        action = "target"
 
         print(f"[Pi] Sending vote for player {vote}...")
         await send_signal_to_server(ws, action, vote, name)
@@ -107,6 +106,13 @@ async def rpi_helper(ws, name, imu, recognizer):
                 role = action
                 print(f"[DEBUG] received role: {action}")
                 continue
+
+                # Only act when server asks you to
+            # if action in ["vote", "kill", "save"]:
+            #     if action == "vote":
+            #         await handle_vote(ws, imu, recognizer, name)
+            #     elif action == "kill" or action == "save":
+            #         await handle_vote(ws, imu, recognizer, name)
         
             # server tells us it's our turn to vote
             print("[Pi] Are you running on your raspberry pi? (y for raspberry pi, n for local debugging): ", end='')
@@ -125,8 +131,8 @@ async def rpi_helper(ws, name, imu, recognizer):
         print("[DEBUG] Player leaving...")
 
 async def rpi_handler(name):
-    # uri = f"ws://{SERVER_IP}:{SERVER_PORT}"
-    uri = f"wss://{SERVER_IP}/ws"
+    uri = f"ws://{SERVER_IP}:{SERVER_PORT}"
+    # uri = f"wss://{SERVER_IP}/ws"
 
     print(f"[DEBUG] Connecting to {uri}")
 
