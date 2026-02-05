@@ -3,6 +3,7 @@ import { API_CONFIG } from '../config/api.config';
 
 interface UseGameSocketReturn {
     role: string | null;
+    playerId: number | null;
     sendHeadPosition: (position: string) => void;
     sendVoiceCommand: (command: number) => void;
 }
@@ -13,6 +14,7 @@ export const useGameSocket = (
 ): UseGameSocketReturn => {
     const gameSocketRef = useRef<WebSocket | null>(null);
     const [role, setRole] = useState<string | null>(null);
+    const [playerId, setPlayerId] = useState<number | null>(null);
     const hasSetupRef = useRef(false);
     const reconnectTimeoutRef = useRef<NodeJS.Timeout>(null);
 
@@ -51,6 +53,7 @@ export const useGameSocket = (
 
                     if (data.action === 'id_registered') {
                         console.log(`[Game] Player registered: ${data.player}`);
+                        setPlayerId(data.player);
                         onStatusChange(`Registered as ${data.player}. Waiting for role...`);
                     }
 
@@ -130,5 +133,5 @@ export const useGameSocket = (
         }
     };
 
-    return { role, sendHeadPosition, sendVoiceCommand };
+    return { role, playerId, sendHeadPosition, sendVoiceCommand };
 };

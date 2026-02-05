@@ -2,9 +2,11 @@ import { useEffect, useRef } from 'react';
 
 interface RemoteVideoProps {
   stream: MediaStream;
+  playerName?: string;
+  playerId?: number;
 }
 
-export const RemoteVideo: React.FC<RemoteVideoProps> = ({ stream }) => {
+export const RemoteVideo: React.FC<RemoteVideoProps> = ({ stream, playerName, playerId }) => {
   const ref = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -44,6 +46,26 @@ export const RemoteVideo: React.FC<RemoteVideoProps> = ({ stream }) => {
       >
         LIVE
       </div>
+      {(playerName || playerId) && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '0',
+            left: '0',
+            right: '0',
+            background: 'rgba(0, 0, 0, 0.7)',
+            color: 'white',
+            padding: '8px',
+            borderRadius: '0 0 8px 8px',
+            fontSize: '14px',
+            fontWeight: 'bold',
+            textAlign: 'center'
+          }}
+        >
+          {playerName && <div>{playerName}</div>}
+          {playerId && <div style={{ fontSize: '12px', opacity: 0.9 }}>ID: {playerId}</div>}
+        </div>
+      )}
     </div>
   );
 };

@@ -20,7 +20,7 @@ export default function GameRoom({ playerName }: GameProps) {
   const [isStarted, setIsStarted] = useState(false);
 
   // Game server connection
-  const { role, sendHeadPosition, sendVoiceCommand } = useGameSocket(setStatus, playerName);
+  const { role, playerId, sendHeadPosition, sendVoiceCommand } = useGameSocket(setStatus, playerName);
 
   // Voice recognition
   const { isListening, start: startVoice, stop: stopVoice } = useVoiceRecognition(
@@ -40,7 +40,7 @@ export default function GameRoom({ playerName }: GameProps) {
   });
 
   // WebRTC peer connections
-  const { remoteStreams } = useWebRTC(localStream, setStatus);
+  const { remoteStreams } = useWebRTC(localStream, setStatus, playerName, playerId);
 
   const handleStart = async (useTestVideos: boolean) => {
     if (useTestVideos) {
@@ -102,8 +102,13 @@ export default function GameRoom({ playerName }: GameProps) {
             {isStarted ? "No other players yet. Open another tab/device and click Start!" : "Start the stream to connect"}
           </p>
         ) : (
-          remoteStreams.map((stream) => (
-            <RemoteVideo key={stream.id} stream={stream} />
+          remoteStreams.map((streamInfo) => (
+            <RemoteVideo 
+              key={streamInfo.stream.id} 
+              stream={streamInfo.stream}
+              playerName={streamInfo.playerName}
+              playerId={streamInfo.playerId}
+            />
           ))
         )}
       </div>

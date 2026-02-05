@@ -2,17 +2,27 @@ import { useEffect, useRef, useState } from 'react';
 import io, { Socket } from 'socket.io-client';
 import { API_CONFIG } from '../config/api.config';
 
+interface RemoteStreamWithInfo {
+    stream: MediaStream;
+    playerName?: string;
+    playerId?: number;
+}
+
 interface UseWebRTCReturn {
-    remoteStreams: MediaStream[];
+    remoteStreams: RemoteStreamWithInfo[];
 }
 
 export const useWebRTC = (
     localStream: MediaStream | null,
-    onStatusChange: (status: string) => void
+    onStatusChange: (status: string) => void,
+    playerName: string,
+    playerId: number | null
 ): UseWebRTCReturn => {
     const socketRef = useRef<Socket | null>(null);
     const peerRefs = useRef<{ [key: string]: RTCPeerConnection }>({});
-    const [remoteStreams, setRemoteStreams] = useState<MediaStream[]>([]);
+    const [remoteStreams, setRemoteStreams] = useState<RemoteStreamWithInfo[]>([]);
+    const playerInfoMapRef = useRef<{ [socketId: string]: { name: string; id: number } }>({});
+    const streamToSocketIdRef = useRef<{ [streamId: string]: string }>({});
 
     useEffect(() => {
         if (!localStream) return;
@@ -23,6 +33,16 @@ export const useWebRTC = (
         socketRef.current.on('connect', () => {
             console.log('[WebRTC] Connected to signaling server');
             socketRef.current?.emit('join-room', 'test-room');
+            
+            // Send player info when connecting
+            if (playerId !== null) {
+                socketRef.current?.emit('broadcast-player-info', {
+                    name: playerName,
+                    id: playerId
+                });
+                console.log(`[WebRTC] Sent player info: ${playerName} (ID: ${playerId})`);
+            }
+            
             onStatusChange('Connected to video server!');
         });
 
@@ -70,9 +90,18 @@ export const useWebRTC = (
             peer.ontrack = (event: RTCTrackEvent) => {
                 console.log(`Received remote track from ${otherId}`);
                 const remoteStream = event.streams[0];
+                const playerInfo = playerInfoMapRef.current[otherId];
+                
+                // Store mapping of stream ID to socket ID
+                streamToSocketIdRef.current[remoteStream.id] = otherId;
+                
                 setRemoteStreams((prev) => {
-                    if (prev.some((s) => s.id === remoteStream.id)) return prev;
-                    return [...prev, remoteStream];
+                    if (prev.some((s) => s.stream.id === remoteStream.id)) return prev;
+                    return [...prev, {
+                        stream: remoteStream,
+                        playerName: playerInfo?.name,
+                        playerId: playerInfo?.id
+                    }];
                 });
             };
 
@@ -92,6 +121,16 @@ export const useWebRTC = (
 
         socketRef.current.on('user-joined', async (id: string) => {
             console.log(`User joined: ${id}`);
+            
+            // Send player info to the new peer
+            if (playerId !== null) {
+                socketRef.current?.emit('player-info', {
+                    to: id,
+                    name: playerName,
+                    id: playerId
+                });
+            }
+            
             try {
                 const peer = createPeer(id);
                 const offer = await peer.createOffer();
@@ -100,6 +139,43 @@ export const useWebRTC = (
             } catch (error) {
                 console.error('Error creating offer:', error);
             }
+        });
+        
+        // Listen for player info from others
+        socketRef.current.on('player-info', (data: { from?: string; name: string; id: number }) => {
+            const socketId = data.from;
+            if (socketId) {
+                playerInfoMapRef.current[socketId] = { name: data.name, id: data.id };
+                console.log(`[WebRTC] Received player info: ${data.name} (ID: ${data.id}) from ${socketId}`);
+                
+                // Update existing streams that match this socket ID
+                setRemoteStreams((prev) => {
+                    return prev.map((streamInfo) => {
+                        const streamSocketId = streamToSocketIdRef.current[streamInfo.stream.id];
+                        if (streamSocketId === socketId && !streamInfo.playerName) {
+                            return { ...streamInfo, playerName: data.name, playerId: data.id };
+                        }
+                        return streamInfo;
+                    });
+                });
+            }
+        });
+        
+        // Listen for broadcast player info
+        socketRef.current.on('broadcast-player-info', (data: { socketId: string; name: string; id: number }) => {
+            playerInfoMapRef.current[data.socketId] = { name: data.name, id: data.id };
+            console.log(`[WebRTC] Received broadcast player info: ${data.name} (ID: ${data.id}) from ${data.socketId}`);
+            
+            // Update existing streams that match this socket ID
+            setRemoteStreams((prev) => {
+                return prev.map((streamInfo) => {
+                    const streamSocketId = streamToSocketIdRef.current[streamInfo.stream.id];
+                    if (streamSocketId === data.socketId && !streamInfo.playerName) {
+                        return { ...streamInfo, playerName: data.name, playerId: data.id };
+                    }
+                    return streamInfo;
+                });
+            });
         });
 
         socketRef.current.on('signal', async ({ from, data }: { from: string; data: any }) => {
@@ -128,7 +204,7 @@ export const useWebRTC = (
             socketRef.current?.disconnect();
             Object.values(peerRefs.current).forEach((p) => p.close());
         };
-    }, [localStream, onStatusChange]);
+    }, [localStream, onStatusChange, playerName, playerId]);
 
     return { remoteStreams };
 };
