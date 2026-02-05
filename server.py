@@ -47,6 +47,8 @@ class MafiaGame:
 
     async def request_action(self, name: str, action: str):
         print(f"[DEBUG] NAME: {name}")
+        if name == None:
+            return
         ws = self.rpis[name]
         await send_json(ws, name, action, None)
 
@@ -133,11 +135,11 @@ class MafiaGame:
                 await send_json(ws, name, role, None)
             for name, ws in self.rpis.items():
                 role = "civilian"
-            if name == self.mafia_name_one or name == self.mafia_name_two:
-                role = "mafia"
-            elif name == self.doctor_name_one or name == self.doctor_name_two:
-                role = "doctor"
-            await send_json(ws, name, role, None)
+                if name == self.mafia_name_one or name == self.mafia_name_two:
+                    role = "mafia"
+                elif name == self.doctor_name_one or name == self.doctor_name_two:
+                    role = "doctor"
+                await send_json(ws, name, role, None)
         else:
             for ws, name in self.clients.items():
                 role = "civilian"
@@ -148,11 +150,11 @@ class MafiaGame:
                 await send_json(ws, name, role, None)
             for name, ws in self.rpis.items():
                 role = "civilian"
-            if name == self.mafia_name_one:
-                role = "mafia"
-            elif name == self.doctor_name_one:
-                role = "doctor"
-            await send_json(ws, name, role, None)
+                if name == self.mafia_name_one:
+                    role = "mafia"
+                elif name == self.doctor_name_one:
+                    role = "doctor"
+                await send_json(ws, name, role, None)
 
 
     async def update(self):
@@ -242,7 +244,7 @@ class MafiaGame:
 
 # ------------------ SERVER ------------------
 
-game = MafiaGame(8)
+game = MafiaGame(3)
 lock = asyncio.Lock()
 
 

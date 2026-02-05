@@ -21,7 +21,7 @@ export const useMediaStream = (
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: { width: 640, height: 480 },
-                audio: false
+                audio: true
             });
 
             console.log('Camera stream obtained:', stream.getTracks());
@@ -30,7 +30,7 @@ export const useMediaStream = (
                 localVideoRef.current.srcObject = stream;
             }
             setLocalStream(stream);
-            onStatusChange('Camera connected!');
+            onStatusChange('Camera and Microphone connected!');
         } catch (error) {
             if (error instanceof Error) {
                 if (error.name === 'NotAllowedError') {
