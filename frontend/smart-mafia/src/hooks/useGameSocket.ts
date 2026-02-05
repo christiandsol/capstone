@@ -1,11 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { API_CONFIG } from '../config/api.config';
 
+interface LobbyStatus {
+    ready_count: number;
+    total_count: number;
+    min_players: number;
+    max_players: number;
+    players: { [name: string]: boolean };
+}
+
 interface UseGameSocketReturn {
     role: string | null;
     playerId: number | null;
+    lobbyStatus: LobbyStatus | null;
     sendHeadPosition: (position: string) => void;
     sendVoiceCommand: (command: number) => void;
+    sendReady: () => void;
 }
 
 export const useGameSocket = (
@@ -15,8 +25,9 @@ export const useGameSocket = (
     const gameSocketRef = useRef<WebSocket | null>(null);
     const [role, setRole] = useState<string | null>(null);
     const [playerId, setPlayerId] = useState<number | null>(null);
+    const [lobbyStatus, setLobbyStatus] = useState<LobbyStatus | null>(null);
     const hasSetupRef = useRef(false);
-    const reconnectTimeoutRef = useRef<NodeJS.Timeout>(null);
+    const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         let isCurrentConnection = true;
@@ -30,7 +41,6 @@ export const useGameSocket = (
 
             const wsUrl = `${protocol}://${host}${protocol === 'ws' ? `:${port}` : ''}/ws`;
 
-            // const wsUrl = `ws://${API_CONFIG.GAME_SERVER_HOST}:${API_CONFIG.GAME_SERVER_PORT}`;
             console.log('[Game] Connecting to:', wsUrl);
 
             try {
@@ -60,7 +70,15 @@ export const useGameSocket = (
                     if (data.action === 'id_registered') {
                         console.log(`[Game] Player registered: ${data.player}`);
                         setPlayerId(data.player);
-                        onStatusChange(`Registered as ${data.player}. Waiting for role...`);
+                        onStatusChange(`Registered as Player ${data.player}. Waiting in lobby...`);
+                    }
+
+                    if (data.action === 'lobby_status') {
+                        setLobbyStatus(data.target);
+                        const { ready_count, total_count, min_players } = data.target;
+                        onStatusChange(
+                            `Lobby: ${ready_count}/${total_count} ready (min: ${min_players})`
+                        );
                     }
 
                     if (['mafia', 'doctor', 'civilian'].includes(data.action)) {
@@ -139,5 +157,15 @@ export const useGameSocket = (
         }
     };
 
-    return { role, playerId, sendHeadPosition, sendVoiceCommand };
+    const sendReady = () => {
+        if (gameSocketRef.current?.readyState === WebSocket.OPEN) {
+            gameSocketRef.current.send(JSON.stringify({
+                action: 'ready',
+                target: null
+            }));
+            console.log('[Game] Sent ready signal');
+        }
+    };
+
+    return { role, playerId, lobbyStatus, sendHeadPosition, sendVoiceCommand, sendReady };
 };

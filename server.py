@@ -7,13 +7,13 @@ from util import send_json, parse_json
 
 HOST = "0.0.0.0"
 PORT = 5050
-MAX_PLAYERS = 10
+MAX_PLAYERS = 8
 
 class MafiaGame:
-    def __init__(self, players: int):
+    def __init__(self):
         self.state = "LOBBY"
         self.expected_signals = {"setup"}
-        self.player_cap = players
+        self.max_players = MAX_PLAYERS
 
         self.players: Dict[str, dict] = {}  # name -> player data
         self.clients: Dict[WebSocketServerProtocol, str] = {}  # ws -> name
@@ -35,8 +35,11 @@ class MafiaGame:
     def valid_signal(self, signal):
         return signal and signal.get("action") in self.expected_signals
 
-    def check_everyone_in_game(self):
-        return len(self.players) == self.player_cap and all(p["setup"] for p in self.players.values())
+    def check_everyone_ready(self):
+        """Check if all players are ready to start (minimum 3 players)"""
+        if len(self.players) < 3:
+            return False
+        return all(p["ready"] for p in self.players.values())
 
     def check_heads_down(self, allowed: List[str | None]):
         for name, data in self.players.items():
@@ -84,7 +87,7 @@ class MafiaGame:
                 return save
             return None
         elif self.doctor_count == 2:
-            if self.doctor_name_one and self.players[self.doctor_name_one]["save"] and self.mafia_name_two and self.players[self.doctor_name_two]["save"]:
+            if self.doctor_name_one and self.players[self.doctor_name_one]["save"] and self.doctor_name_two and self.players[self.doctor_name_two]["save"]:
                 if self.players[self.doctor_name_one]["save"] == self.players[self.doctor_name_two]["save"]:
                     save = self.players[self.doctor_name_one]["save"]
                     self.players[self.doctor_name_one]["save"] = None
@@ -119,6 +122,23 @@ class MafiaGame:
     async def broadcast(self, action, target=None):
         for ws, name in self.clients.items():
             await send_json(ws, name, action, target)
+
+    async def broadcast_lobby_status(self):
+        """Broadcast current lobby status to all players"""
+        ready_count = sum(1 for p in self.players.values() if p["ready"])
+        total_count = len(self.players)
+        
+        for ws, name in self.clients.items():
+            await send_json(ws, name, "lobby_status", {
+                "ready_count": ready_count,
+                "total_count": total_count,
+                "min_players": 3,
+                "max_players": self.max_players,
+                "players": {
+                    pname: pdata["ready"] 
+                    for pname, pdata in self.players.items()
+                }
+            })
 
     async def broadcast_vote(self):
         for name in self.rpis:
@@ -158,17 +178,22 @@ class MafiaGame:
 
 
     async def update(self):
-        if self.state == "LOBBY" and self.check_everyone_in_game():
-            print("All players connected")
-            # Assign roles randomly
+        if self.state == "LOBBY" and self.check_everyone_ready():
+            print(f"[DEBUG] All {len(self.players)} players ready! Starting game...")
+            # Assign roles randomly based on player count
             player_names = list(self.players.keys())
-            if len(player_names) >= 7:
+            num_players = len(player_names)
+            
+            if num_players >= 7:
                 self.mafia_count = 2
                 self.doctor_count = 2
                 self.mafia_name_one, self.mafia_name_two, self.doctor_name_one, self.doctor_name_two = random.sample(player_names, 4)
             else:
-                mafia_count = 1
+                self.mafia_count = 1
+                self.doctor_count = 1
                 self.mafia_name_one, self.doctor_name_one = random.sample(player_names, 2)
+                
+            print(f"[DEBUG] Assigned roles: Mafia={self.mafia_count}, Doctor={self.doctor_count}")
             self.state = "ASSIGN"
             self.expected_signals = set()
 
@@ -184,15 +209,12 @@ class MafiaGame:
             self.expected_signals = {"headUp", "headDown", "voiceCommand"}
             print("MOVING ON TO MAFIA VOTE STAGE")
             if self.mafia_count == 1:
-                await asyncio.wait(
-                    [
-                        self.request_action(self.mafia_name_one, "kill"),
-                        self.request_action(self.mafia_name_two, "kill")
-                    ],
-                    return_when=asyncio.FIRST_COMPLETED
-                )
+                await self.request_action(self.mafia_name_one, "kill")
             elif self.mafia_count == 2:
-                await asyncio.gather(self.request_action(self.mafia_name_one, "kill"), self.request_action(self.mafia_name_two, "kill"))
+                await asyncio.gather(
+                    self.request_action(self.mafia_name_one, "kill"), 
+                    self.request_action(self.mafia_name_two, "kill")
+                )
 
         if self.state == "MAFIAVOTE":
             if self.check_heads_down([self.mafia_name_one, self.mafia_name_two]):
@@ -203,15 +225,12 @@ class MafiaGame:
                     self.state = "DOCTORVOTE" if (self.doctor_name_one or self.doctor_name_two) else "NARRATE"
                     if self.state == "DOCTORVOTE":
                         if self.doctor_count == 1:
-                            await asyncio.wait(
-                                [
-                                    self.request_action(self.doctor_name_one, "save"),
-                                    self.request_action(self.doctor_name_two, "save")
-                                ],
-                                return_when=asyncio.FIRST_COMPLETED
-                            )
+                            await self.request_action(self.doctor_name_one, "save")
                         elif self.doctor_count == 2:
-                            await asyncio.gather(self.request_action(self.doctor_name_one, "save"), self.request_action(self.doctor_name_two, "save"))
+                            await asyncio.gather(
+                                self.request_action(self.doctor_name_one, "save"), 
+                                self.request_action(self.doctor_name_two, "save")
+                            )
 
         if self.state == "DOCTORVOTE":
             if self.check_heads_down([self.doctor_name_one, self.doctor_name_two]):
@@ -244,7 +263,7 @@ class MafiaGame:
 
 # ------------------ SERVER ------------------
 
-game = MafiaGame(3)
+game = MafiaGame()
 lock = asyncio.Lock()
 
 
@@ -268,7 +287,6 @@ async def handler(ws: WebSocketServerProtocol):
                     ctrl_name = target.get("name")
                 
                 print(f"[VOICE_COMMAND] Received: player={player_name}, code={ctrl_code}, action={ctrl_name}")
-                # Server logic can now act on these control actions
                 continue
             
             # Handle setup message
@@ -281,15 +299,14 @@ async def handler(ws: WebSocketServerProtocol):
                     continue
                 print(f"[DEBUG] server adding player: {player_name}")
                 
-                # Move lock inside the loop, not outside
                 async with lock:
                     if player_name in game.players:
                         print(f"[DEBUG] Name {player_name} already taken")
                         await ws.close(1008, "Name already taken")
                         return
                     
-                    if len(game.players) >= game.player_cap:
-                        print(f"[DEBUG] Game is full")
+                    if len(game.players) >= game.max_players:
+                        print(f"[DEBUG] Game is full ({game.max_players} players)")
                         await ws.close(1008, "Game is full")
                         return
 
@@ -297,10 +314,11 @@ async def handler(ws: WebSocketServerProtocol):
                     game.player_id_to_name[player_id] = player_name
                     game.name_to_player_id[player_name] = player_id
 
-                    # Register player
+                    # Register player (NOT ready by default)
                     game.clients[ws] = player_name
                     game.players[player_name] = {
                         "setup": True,
+                        "ready": False,
                         "head": "up",
                         "vote": None,
                         "kill": None,
@@ -312,8 +330,22 @@ async def handler(ws: WebSocketServerProtocol):
                 await send_json(ws, player_id, "id_registered", None)
                 print(f"[DEBUG] Player {player_name} registered successfully with ID {player_id}")
                 
-                # Trigger game update
-                await game.update()
+                # Broadcast lobby status to all players
+                await game.broadcast_lobby_status()
+                continue
+            
+            # Handle ready signal
+            if msg.get("action") == "ready":
+                async with lock:
+                    if player_name and player_name in game.players:
+                        game.players[player_name]["ready"] = True
+                        print(f"[DEBUG] Player {player_name} is ready!")
+                        
+                        # Broadcast updated lobby status
+                        await game.broadcast_lobby_status()
+                        
+                        # Try to start the game
+                        await game.update()
                 continue
             
             # Handle other game signals
@@ -332,9 +364,9 @@ async def handler(ws: WebSocketServerProtocol):
                         player_data["head"] = "down"
                     elif action == "voiceCommand":
                         target = msg.get("target")
-                        print(f"[DEBUG], recieved target signal with target: {target}, of type: {type(target)}")
+                        print(f"[DEBUG], received target signal with target: {target}, of type: {type(target)}")
 
-                        if target.isnumeric():
+                        if isinstance(target, str) and target.isnumeric():
                             target = int(target)
                             target = game.id_to_name(target)
                             if target is None:
@@ -343,7 +375,7 @@ async def handler(ws: WebSocketServerProtocol):
                         
                         if (player_name == game.mafia_name_one or player_name == game.mafia_name_two) and game.state == "MAFIAVOTE":
                             player_data["kill"] = target
-                        elif (player_name == game.doctor_name_one or game.doctor_name_two) and game.state == "DOCTORVOTE":
+                        elif (player_name == game.doctor_name_one or player_name == game.doctor_name_two) and game.state == "DOCTORVOTE":
                             player_data["save"] = target
                         else:
                             player_data["vote"] = target
@@ -368,6 +400,11 @@ async def handler(ws: WebSocketServerProtocol):
                         del game.player_id_to_name[player_id]
                         del game.name_to_player_id[player_name]
                     del game.players[player_name]
+                
+                # Broadcast updated lobby status if still in lobby
+                if game.state == "LOBBY":
+                    await game.broadcast_lobby_status()
+                    
             print(f"[DEBUG] Player {player_name} removed from game")
 
 async def main():

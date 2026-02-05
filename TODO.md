@@ -2,20 +2,9 @@
 # TODO
 
 # Global TODO: 
-- raspberry pi integration? (Almost done?)
-    - hwo to get role if you just immediately connect?
-    - it would be a good idea to have a component that changes it's value simply based off server inputs
-    - JUST added playerID
-- have names show up alongside players (as well as their status of alive or dead)
-    - have server send when someone dies
-- narration to everyone, how are we doing that?
-- join room/start game maybe add it back?
-- dynamic mafia's/players?
-- Game completion? Re-do game?
-- How to handle player_id's?
-
-- Where you left off:
-    - just received the role on raspberry pi end, now you can go ahead and send over the role to handle it on the server end
+- [ ] refresh game, don't leave and reconnect?
+- [ ] varied amounts of players at a time? When everyone is okay with starting
+- [ ] restart game?
 
 Kirt:
 - [x] Finish game logic for more players

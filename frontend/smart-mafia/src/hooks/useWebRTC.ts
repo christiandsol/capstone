@@ -33,7 +33,7 @@ export const useWebRTC = (
         socketRef.current.on('connect', () => {
             console.log('[WebRTC] Connected to signaling server');
             socketRef.current?.emit('join-room', 'test-room');
-            
+
             // Send player info when connecting
             if (playerId !== null) {
                 socketRef.current?.emit('broadcast-player-info', {
@@ -42,7 +42,7 @@ export const useWebRTC = (
                 });
                 console.log(`[WebRTC] Sent player info: ${playerName} (ID: ${playerId})`);
             }
-            
+
             onStatusChange('Connected to video server!');
         });
 
@@ -91,10 +91,10 @@ export const useWebRTC = (
                 console.log(`Received remote track from ${otherId}`);
                 const remoteStream = event.streams[0];
                 const playerInfo = playerInfoMapRef.current[otherId];
-                
+
                 // Store mapping of stream ID to socket ID
                 streamToSocketIdRef.current[remoteStream.id] = otherId;
-                
+
                 setRemoteStreams((prev) => {
                     if (prev.some((s) => s.stream.id === remoteStream.id)) return prev;
                     return [...prev, {
@@ -121,7 +121,7 @@ export const useWebRTC = (
 
         socketRef.current.on('user-joined', async (id: string) => {
             console.log(`User joined: ${id}`);
-            
+
             // Send player info to the new peer
             if (playerId !== null) {
                 socketRef.current?.emit('player-info', {
@@ -130,7 +130,7 @@ export const useWebRTC = (
                     id: playerId
                 });
             }
-            
+
             try {
                 const peer = createPeer(id);
                 const offer = await peer.createOffer();
@@ -140,14 +140,14 @@ export const useWebRTC = (
                 console.error('Error creating offer:', error);
             }
         });
-        
+
         // Listen for player info from others
         socketRef.current.on('player-info', (data: { from?: string; name: string; id: number }) => {
             const socketId = data.from;
             if (socketId) {
                 playerInfoMapRef.current[socketId] = { name: data.name, id: data.id };
                 console.log(`[WebRTC] Received player info: ${data.name} (ID: ${data.id}) from ${socketId}`);
-                
+
                 // Update existing streams that match this socket ID
                 setRemoteStreams((prev) => {
                     return prev.map((streamInfo) => {
@@ -160,12 +160,12 @@ export const useWebRTC = (
                 });
             }
         });
-        
+
         // Listen for broadcast player info
         socketRef.current.on('broadcast-player-info', (data: { socketId: string; name: string; id: number }) => {
             playerInfoMapRef.current[data.socketId] = { name: data.name, id: data.id };
             console.log(`[WebRTC] Received broadcast player info: ${data.name} (ID: ${data.id}) from ${data.socketId}`);
-            
+
             // Update existing streams that match this socket ID
             setRemoteStreams((prev) => {
                 return prev.map((streamInfo) => {

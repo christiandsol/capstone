@@ -3,9 +3,7 @@ import http from "http";
 import { Server } from "socket.io";
 
 const app = express();
-
-app.use(express.json())
-
+app.use(express.json());
 app.use(express.static('public', {
   setHeaders: (res) => {
     res.set('Access-Control-Allow-Origin', '*');
@@ -14,7 +12,6 @@ app.use(express.static('public', {
 }));
 
 const server = http.createServer(app);
-
 const io = new Server(server, {
   cors: {
     origin: "*",
@@ -24,11 +21,7 @@ const io = new Server(server, {
   transports: ['websocket', 'polling']
 });
 
-
 // ======= DEFINING METHODS ======
-
-
-
 io.on("connection", socket => {
   console.log("Connected:", socket.id);
 
@@ -67,6 +60,14 @@ io.on("connection", socket => {
 
   socket.on("disconnect", () => {
     console.log("Disconnected:", socket.id);
+
+    // Notify all rooms that this user has left
+    socket.rooms.forEach(room => {
+      if (room !== socket.id) { // Don't emit to the socket's own room
+        socket.to(room).emit("user-left", socket.id);
+        console.log(`[Server] Notified room ${room} that ${socket.id} left`);
+      }
+    });
   });
 });
 
