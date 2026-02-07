@@ -31,6 +31,7 @@ class MafiaGame:
         self.last_saved = None
         self.mafia_count = None
         self.doctor_count = None
+        self.civilian_count = None
 
     def valid_signal(self, signal):
         return signal and signal.get("action") in self.expected_signals
@@ -65,13 +66,19 @@ class MafiaGame:
 
     def mafia_kill(self):
         if self.mafia_count == 1:
-            if self.mafia_name_one and self.players[self.mafia_name_one]["kill"]:
+            print(f"[DEBUG] pick something")
+            if self.players[self.mafia_name_one]["alive"] and self.players[self.mafia_name_one]["kill"]:
                 kill = self.players[self.mafia_name_one]["kill"]
                 self.players[self.mafia_name_one]["kill"] = None
                 return kill
+            if self.mafia_name_two != None:
+                if self.players[self.mafia_name_two]["alive"] and self.players[self.mafia_name_two]["kill"]:
+                    kill = self.players[self.mafia_name_two]["kill"]
+                    self.players[self.mafia_name_two]["kill"] = None
+                    return kill
             return None
         elif self.mafia_count == 2:
-            if self.mafia_name_one and self.players[self.mafia_name_one]["kill"] and self.mafia_name_two and self.players[self.mafia_name_two]["kill"]:
+            if self.players[self.mafia_name_one]["alive"] and self.players[self.mafia_name_one]["kill"] and self.players[self.mafia_name_one]["alive"] and self.players[self.mafia_name_two]["kill"]:
                 if self.players[self.mafia_name_one]["kill"] == self.players[self.mafia_name_two]["kill"]:
                     kill = self.players[self.mafia_name_one]["kill"]
                     self.players[self.mafia_name_one]["kill"] = None
@@ -81,9 +88,14 @@ class MafiaGame:
 
     def doctor_save(self):
         if self.doctor_count == 1:
-            if self.doctor_name_one and self.players[self.doctor_name_one]["save"]:
+            if self.players[self.doctor_name_one]["alive"] and self.players[self.doctor_name_one]["save"]:
                 save = self.players[self.doctor_name_one]["save"]
                 self.players[self.doctor_name_one]["save"] = None
+                return save
+            if self.doctor_name_two != None:
+                if self.players[self.doctor_name_two]["alive"] and self.players[self.doctor_name_two]["save"]:
+                    save = self.players[self.doctor_name_two]["save"]
+                    self.players[self.doctor_name_two]["save"] = None
                 return save
             return None
         elif self.doctor_count == 2:
@@ -144,6 +156,10 @@ class MafiaGame:
         for name in self.rpis:
             await self.request_action(name, "vote")
 
+    async def broadcast_game_end(self, winner: str):
+        for ws, name in self.clients.items():
+            await send_json(ws, name, winner, None)
+
     async def assign_player(self):
         if self.mafia_count == 2:
             for ws, name in self.clients.items():
@@ -187,10 +203,12 @@ class MafiaGame:
             if num_players >= 7:
                 self.mafia_count = 2
                 self.doctor_count = 2
+                self.civilian_count = num_players - 2
                 self.mafia_name_one, self.mafia_name_two, self.doctor_name_one, self.doctor_name_two = random.sample(player_names, 4)
             else:
                 self.mafia_count = 1
                 self.doctor_count = 1
+                self.civilian_count = num_players - 1
                 self.mafia_name_one, self.doctor_name_one = random.sample(player_names, 2)
                 
             print(f"[DEBUG] Assigned roles: Mafia={self.mafia_count}, Doctor={self.doctor_count}")
@@ -203,13 +221,16 @@ class MafiaGame:
             self.state = "HEADSDOWN"
             self.expected_signals = {"headUp", "headDown"}
             print("Moving on to mafia stage, everyone put head down please")
-
-        if self.state == "HEADSDOWN" and self.check_heads_down([]):
+# and self.check_heads_down([])
+        if self.state == "HEADSDOWN":
             self.state = "MAFIAVOTE"
-            self.expected_signals = {"headUp", "headDown", "voiceCommand"}
+            self.expected_signals = {"headUp", "headDown", "voiceCommand", "targeted"}
             print("MOVING ON TO MAFIA VOTE STAGE")
             if self.mafia_count == 1:
-                await self.request_action(self.mafia_name_one, "kill")
+                if self.players[self.mafia_name_one]["alive"] == True:
+                    await self.request_action(self.mafia_name_one, "kill")
+                elif self.players[self.mafia_name_two]["alive"] == True and self.mafia_name_two != None:
+                    await self.request_action(self.mafia_name_two, "kill")
             elif self.mafia_count == 2:
                 await asyncio.gather(
                     self.request_action(self.mafia_name_one, "kill"), 
@@ -217,15 +238,18 @@ class MafiaGame:
                 )
 
         if self.state == "MAFIAVOTE":
-            if self.check_heads_down([self.mafia_name_one, self.mafia_name_two]):
+ #           if self.check_heads_down([self.mafia_name_one, self.mafia_name_two]):
                 kill = self.mafia_kill()
-                if kill:
+                if kill != None:
+                    print(f"[DEBUG] kill successful")      
                     self.last_killed = kill
-                    self.players[kill]["alive"] = False
-                    self.state = "DOCTORVOTE" if (self.doctor_name_one or self.doctor_name_two) else "NARRATE"
+                    self.state = "DOCTORVOTE" if (self.players[self.doctor_name_one]["alive"] or (self.doctor_name_two != None and self.players[self.doctor_name_one]["alive"])) else "NARRATE"
                     if self.state == "DOCTORVOTE":
                         if self.doctor_count == 1:
-                            await self.request_action(self.doctor_name_one, "save")
+                            if self.players[self.doctor_name_one]["alive"] == True:
+                                await self.request_action(self.doctor_name_one, "save")
+                            elif self.players[self.doctor_name_two]["alive"] == True and self.doctor_name_two != None:
+                                await self.request_action(self.doctor_name_two, "save")
                         elif self.doctor_count == 2:
                             await asyncio.gather(
                                 self.request_action(self.doctor_name_one, "save"), 
@@ -233,11 +257,21 @@ class MafiaGame:
                             )
 
         if self.state == "DOCTORVOTE":
-            if self.check_heads_down([self.doctor_name_one, self.doctor_name_two]):
+ #           if self.check_heads_down([self.doctor_name_one, self.doctor_name_two]):
                 save = self.doctor_save()
                 if save:
                     self.last_saved = save
-                    self.players[save]["alive"] = True
+                    if self.last_saved != self.last_killed:
+                        print(f"[DEBUG] save failed") 
+                        self.players[self.last_killed]["alive"] = False
+                        if (self.last_killed == self.doctor_name_one) or (self.last_killed == self.doctor_name_two):
+                            self.doctor_count -= 1
+                            self.civilian_count -= 1
+                        elif (self.last_killed == self.mafia_name_one) or (self.last_killed == self.mafia_name_two):
+                            self.mafia_count -= 1
+                        else:
+                            self.civilian_count -= 1
+                    print(f"[DEBUG] save successful") 
                     self.state = "NARRATE"
 
         if self.state == "NARRATE":
@@ -245,8 +279,11 @@ class MafiaGame:
                 "killed": self.last_killed,
                 "saved": self.last_saved
             })
+            if self.mafia_count >= self.civilian_count:
+                if self.mafia_count >= self.civilian_count:
+                    print(f"mafia win")
             self.state = "VOTE"
-            self.expected_signals = {"voiceCommand"}
+            self.expected_signals = {"voiceCommand", "targeted"}
             await self.broadcast_vote()
 
         if self.state == "VOTE" and self.everyone_voted():
@@ -255,8 +292,31 @@ class MafiaGame:
                 print(f"[DEBUG] voted tied between {[player for player in voted_out]}")
                 await self.broadcast("vote_result_tie", voted_out)
                 await self.broadcast_vote()
-                return 
+                return
+            if self.players[voted_out[0]]["alive"] == True:
+                if self.players[self.mafia_name_one]["alive"] == True and self.mafia_name_one == voted_out[0]:
+                    self.players[self.mafia_name_one]["alive"] = False
+                    self.mafia_count -= 1
+                elif self.mafia_name_two != None:
+                    if self.players[self.mafia_name_two]["alive"] == True and self.mafia_name_two == voted_out[0]:
+                        self.players[self.mafia_name_two]["alive"] = False
+                        self.mafia_count -= 1
+                elif self.players[self.doctor_name_one]["alive"] == True and self.doctor_name_one == voted_out[0]:
+                    self.players[self.doctor_name_one]["alive"] = False
+                    self.doctor_count -= 1
+                    self.civilian_count -= 1
+                elif self.doctor_name_two != None:
+                    if self.players[self.doctor_name_two]["alive"] == True and self.doctor_name_two == voted_out[0]:
+                        self.players[self.doctor_name_two]["alive"] = False
+                        self.doctor_count -= 1
+                        self.civilian_count -= 1
+                else:
+                    self.civilian_count -= 1       
             await self.broadcast("vote_result", voted_out)
+            if self.mafia_count >= self.civilian_count:
+                print(f"mafia win")
+            elif self.mafia_count == 0:
+                print(f"civilians win")
             self.state = "HEADSDOWN"
             self.expected_signals = {"headUp", "headDown"}
 
@@ -351,7 +411,7 @@ async def handler(ws: WebSocketServerProtocol):
             # Handle other game signals
             if player_name and game.valid_signal(msg):
                 action = msg["action"]
-                
+                print(f"received signal {msg}")
                 async with lock:
                     if player_name not in game.players:
                         continue
@@ -362,7 +422,7 @@ async def handler(ws: WebSocketServerProtocol):
                         player_data["head"] = "up"
                     elif action == "headDown":
                         player_data["head"] = "down"
-                    elif action == "voiceCommand":
+                    elif action == "voiceCommand" or action == "targeted":
                         target = msg.get("target")
                         print(f"[DEBUG], received target signal with target: {target}, of type: {type(target)}")
 
