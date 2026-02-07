@@ -3,8 +3,8 @@
 
 # Global TODO: 
 - [ ] refresh game, don't leave and reconnect?
-- [ ] varied amounts of players at a time? When everyone is okay with starting
-- [ ] restart game?
+- [x] varied amounts of players at a time? When everyone is okay with starting
+- [ ] restart game??
 
 Kirt:
 - [x] Finish game logic for more players

@@ -9,13 +9,28 @@ interface LobbyStatus {
     players: { [name: string]: boolean };
 }
 
+interface RestartStatus {
+    restart_count: number;
+    total_count: number;
+    players: { [name: string]: boolean };
+}
+
+interface GameOverData {
+    winner: string;
+    mafia: string[];
+}
+
 interface UseGameSocketReturn {
     role: string | null;
     playerId: number | null;
     lobbyStatus: LobbyStatus | null;
+    restartStatus: RestartStatus | null;
+    gameOverData: GameOverData | null;
     sendHeadPosition: (position: string) => void;
+    setCurrentHead: (position: string) => void;
     sendVoiceCommand: (command: number) => void;
     sendReady: () => void;
+    sendRestart: () => void;
 }
 
 export const useGameSocket = (
@@ -23,11 +38,21 @@ export const useGameSocket = (
     playerName: string
 ): UseGameSocketReturn => {
     const gameSocketRef = useRef<WebSocket | null>(null);
+    const currentHeadRef = useRef<string>('headDown');
     const [role, setRole] = useState<string | null>(null);
     const [playerId, setPlayerId] = useState<number | null>(null);
     const [lobbyStatus, setLobbyStatus] = useState<LobbyStatus | null>(null);
+    const [restartStatus, setRestartStatus] = useState<RestartStatus | null>(null);
+    const [gameOverData, setGameOverData] = useState<GameOverData | null>(null);
     const hasSetupRef = useRef(false);
     const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    const setCurrentHead = (position: string) => {
+        currentHeadRef.current = position;
+        // optional: immediately send
+        sendHeadPosition(position);
+    };
+
 
     useEffect(() => {
         let isCurrentConnection = true;
@@ -81,10 +106,26 @@ export const useGameSocket = (
                         );
                     }
 
+                    if (data.action === 'restart_status') {
+                        setRestartStatus(data.target);
+                        const { restart_count, total_count } = data.target;
+                        onStatusChange(
+                            `Restart: ${restart_count}/${total_count} want to play again`
+                        );
+                    }
+
                     if (['mafia', 'doctor', 'civilian'].includes(data.action)) {
                         setRole(data.action);
+                        setGameOverData(null); // Reset game over data when new game starts
+                        setRestartStatus(null);
                         console.log(`[Game] Role: ${data.action}`);
                         onStatusChange(`You are ${data.player} - Role: ${data.action.toUpperCase()}`);
+                    }
+
+                    if (data.action === 'game_over') {
+                        setGameOverData(data.target);
+                        const winner = data.target.winner === 'mafia' ? 'MAFIA' : 'CIVILIANS';
+                        onStatusChange(`GAME OVER! ${winner} WIN!`);
                     }
 
                     if (data.action === 'night_result') {
@@ -93,6 +134,10 @@ export const useGameSocket = (
 
                     if (data.action === 'vote_result') {
                         console.log('[Game] Vote result:', data.target);
+                    }
+
+                    if (data.action == 'heads_down') {
+                        sendHeadPosition(currentHeadRef.current);
                     }
                 };
 
@@ -167,5 +212,26 @@ export const useGameSocket = (
         }
     };
 
-    return { role, playerId, lobbyStatus, sendHeadPosition, sendVoiceCommand, sendReady };
+    const sendRestart = () => {
+        if (gameSocketRef.current?.readyState === WebSocket.OPEN) {
+            gameSocketRef.current.send(JSON.stringify({
+                action: 'restart',
+                target: null
+            }));
+            console.log('[Game] Sent restart signal');
+        }
+    };
+
+    return {
+        role,
+        playerId,
+        lobbyStatus,
+        restartStatus,
+        gameOverData,
+        sendHeadPosition,
+        setCurrentHead,
+        sendVoiceCommand,
+        sendReady,
+        sendRestart
+    };
 };

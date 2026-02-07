@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 interface UseMediaStreamReturn {
     localVideoRef: React.RefObject<HTMLVideoElement | null>;
     localStream: MediaStream | null;
+    isUsingTestVideo: boolean;
     startCamera: () => Promise<void>;
     startTestVideo: () => Promise<void>;
 }
@@ -12,24 +13,23 @@ export const useMediaStream = (
 ): UseMediaStreamReturn => {
     const localVideoRef = useRef<HTMLVideoElement>(null);
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+    const [isUsingTestVideo, setIsUsingTestVideo] = useState(false);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const animationFrameRef = useRef<number | null>(null);
 
     const startCamera = async (): Promise<void> => {
         onStatusChange('Requesting camera access...');
-
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: { width: 640, height: 480 },
                 audio: true
             });
-
             console.log('Camera stream obtained:', stream.getTracks());
-
             if (localVideoRef.current) {
                 localVideoRef.current.srcObject = stream;
             }
             setLocalStream(stream);
+            setIsUsingTestVideo(false); // Using real camera
             onStatusChange('Camera and Microphone connected!');
         } catch (error) {
             if (error instanceof Error) {
@@ -49,7 +49,6 @@ export const useMediaStream = (
         const getTabVideo = (): string => {
             const existing = sessionStorage.getItem('tabVideo');
             if (existing) return existing;
-
             const videoFile = Math.random() < 0.5 ? '/vid1.mp4' : '/vid2.mp4';
             sessionStorage.setItem('tabVideo', videoFile);
             return videoFile;
@@ -76,14 +75,12 @@ export const useMediaStream = (
         await video.play();
 
         onStatusChange('Setting up canvas capture...');
-
         const canvas = document.createElement('canvas');
         canvas.width = 640;
         canvas.height = 480;
         canvasRef.current = canvas;
 
         const ctx = canvas.getContext('2d');
-
         const drawFrame = (): void => {
             if (video.paused || video.ended) return;
             if (ctx) {
@@ -98,8 +95,9 @@ export const useMediaStream = (
             localVideoRef.current.srcObject = stream;
         }
         setLocalStream(stream);
+        setIsUsingTestVideo(true); // Using test video
         onStatusChange('Test video ready!');
     };
 
-    return { localVideoRef, localStream, startCamera, startTestVideo };
+    return { localVideoRef, localStream, isUsingTestVideo, startCamera, startTestVideo };
 };
