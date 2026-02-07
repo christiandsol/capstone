@@ -309,11 +309,13 @@ class MafiaGame:
             if kill:
                 print(f'[DEBUG] Mafia killed: {kill}')
                 self.last_killed = kill
-                self.players[kill]["alive"] = False
+                if not (self.players[self.doctor_name_one]["alive"] or self.players[self.doctor_name_two]["alive"]):
+                    self.players[kill]["alive"] = False
                 
                 # Check if game is over after kill
                 winner = self.check_game_over()
                 if winner:
+                    print("[DEBUG] GAME OVER")
                     self.game_winner = winner
                     self.state = "GAMEOVER"
                     self.expected_signals = set()
@@ -342,9 +344,25 @@ class MafiaGame:
             save = self.doctor_save()
             if save:
                 print(f'[DEBUG] Doctor saved: {save}')
+                print(f'[DEBUG] Last attempted mafia kill: : {self.last_killed}')
+                if self.last_killed != save:
+                    self.players[self.last_killed]["alive"] = False
                 self.last_saved = save
                 self.players[save]["alive"] = True
                 self.state = "NARRATE"
+
+                winner = self.check_game_over()
+                if winner:
+                    print("[DEBUG] GAME OVER")
+                    self.game_winner = winner
+                    self.state = "GAMEOVER"
+                    self.expected_signals = set()
+                    await self.broadcast("game_over", {
+                        "winner": winner,
+                        "mafia": [self.mafia_name_one, self.mafia_name_two] if self.mafia_count == 2 else [self.mafia_name_one]
+                    })
+                    await self.broadcast_restart_status()
+                    return
 
         if self.state == "NARRATE":
             print("[DEBUG] Narrating night results...")
@@ -356,6 +374,7 @@ class MafiaGame:
             # Check if game is over after night
             winner = self.check_game_over()
             if winner:
+                print("[DEBUG] GAME OVER")
                 self.game_winner = winner
                 self.state = "GAMEOVER"
                 self.expected_signals = set()

@@ -58,13 +58,14 @@ io.on("connection", socket => {
     });
   });
 
-  socket.on("disconnect", () => {
+  socket.on("disconnecting", () => {
     console.log("Disconnected:", socket.id);
+    console.log("Broadcasting disconnect now")
 
     // Notify all rooms that this user has left
     socket.rooms.forEach(room => {
       if (room !== socket.id) { // Don't emit to the socket's own room
-        socket.to(room).emit("user-left", socket.id);
+        socket.to(room).emit("user-disconnected", socket.id);
         console.log(`[Server] Notified room ${room} that ${socket.id} left`);
       }
     });

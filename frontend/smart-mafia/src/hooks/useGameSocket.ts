@@ -100,6 +100,12 @@ export const useGameSocket = (
 
                     if (data.action === 'lobby_status') {
                         setLobbyStatus(data.target);
+                        // When we receive lobby_status and we're in game-over state, it means the game has restarted
+                        if (gameOverData) {
+                            setGameOverData(null);
+                            setRestartStatus(null);
+                            setRole(null);
+                        }
                         const { ready_count, total_count, min_players } = data.target;
                         onStatusChange(
                             `Lobby: ${ready_count}/${total_count} ready (min: ${min_players})`
@@ -112,6 +118,14 @@ export const useGameSocket = (
                         onStatusChange(
                             `Restart: ${restart_count}/${total_count} want to play again`
                         );
+
+                        // Check if everyone has agreed to restart
+                        if (restart_count === total_count && total_count > 0) {
+                            console.log('[Game] All players agreed to restart!');
+                            // Clear game over state to trigger transition back to lobby
+                            setGameOverData(null);
+                            setRole(null);
+                        }
                     }
 
                     if (['mafia', 'doctor', 'civilian'].includes(data.action)) {

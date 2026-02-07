@@ -97,6 +97,12 @@ export default function GameRoom({ playerName }: GameProps) {
   const gameHasStarted = role !== null && !gameOverData;
   const gameIsOver = gameOverData !== null;
 
+  // Reset UI state when returning to lobby after restart
+  if (!gameIsOver && (hasClickedReady || hasClickedRestart)) {
+    setHasClickedReady(false);
+    setHasClickedRestart(false);
+  }
+
   return (
     <div style={{ padding: "0", fontFamily: "system-ui, sans-serif", background: "#1a1a1a", minHeight: "100vh", color: "white" }}>
       {/* Game Room Heading */}
@@ -141,7 +147,7 @@ export default function GameRoom({ playerName }: GameProps) {
               color: gameOverData.winner === 'mafia' ? '#ff4444' : '#00ff00',
               textShadow: `0 0 20px ${gameOverData.winner === 'mafia' ? '#ff4444' : '#00ff00'}`
             }}>
-              {gameOverData.winner === 'mafia' ? '🔪 MAFIA WINS! 🔪' : '👥 CIVILIANS WIN! 👥'}
+              {gameOverData.winner === 'mafia' ? 'MAFIA WINS!' : 'CIVILIANS WIN!'}
             </h1>
 
             <div style={{ marginTop: '20px', fontSize: '18px' }}>
@@ -188,7 +194,7 @@ export default function GameRoom({ playerName }: GameProps) {
                         fontSize: '12px',
                         color: wantsRestart ? '#00ff00' : '#888'
                       }}>
-                        {wantsRestart ? '✓ Ready' : 'Waiting...'}
+                        {wantsRestart ? 'âœ" Ready' : 'Waiting...'}
                       </span>
                     </div>
                   ))}
@@ -221,7 +227,7 @@ export default function GameRoom({ playerName }: GameProps) {
                     fontSize: '18px',
                     color: '#00ff00'
                   }}>
-                    ✓ Waiting for others to restart...
+                    Waiting for others to restart...
                   </div>
                 )}
               </div>
@@ -266,7 +272,7 @@ export default function GameRoom({ playerName }: GameProps) {
                     fontSize: '12px',
                     color: isReady ? '#00ff00' : '#888'
                   }}>
-                    {isReady ? '✓ READY' : 'Waiting...'}
+                    {isReady ? 'âœ" READY' : 'Waiting...'}
                   </span>
                 </div>
               ))}
@@ -306,7 +312,7 @@ export default function GameRoom({ playerName }: GameProps) {
                 fontSize: '18px',
                 color: '#00ff00'
               }}>
-                ✓ You are ready! Waiting for others...
+                You are ready! Waiting for others...
               </div>
             )}
           </div>
@@ -345,15 +351,15 @@ export default function GameRoom({ playerName }: GameProps) {
         />
 
         <h2 style={{ marginTop: "40px" }}>
-          Other Players ({remoteStreams.length})
+          Other Players ({remoteStreams && remoteStreams.length})
         </h2>
         <div style={{ display: "flex", gap: "15px", flexWrap: "wrap" }}>
-          {remoteStreams.length === 0 ? (
+          {remoteStreams && remoteStreams.length === 0 ? (
             <p style={{ color: "#888", fontSize: "16px" }}>
               {isStarted ? "No other players yet. Open another tab/device and click Start!" : "Start the stream to connect"}
             </p>
           ) : (
-            remoteStreams.map((streamInfo) => (
+            remoteStreams && remoteStreams.map((streamInfo) => (
               <RemoteVideo
                 key={streamInfo.stream.id}
                 stream={streamInfo.stream}

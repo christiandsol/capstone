@@ -97,11 +97,13 @@ export const useWebRTC = (
 
                 setRemoteStreams((prev) => {
                     if (prev.some((s) => s.stream.id === remoteStream.id)) return prev;
-                    return [...prev, {
+                    const updated = [...prev, {
                         stream: remoteStream,
                         playerName: playerInfo?.name,
                         playerId: playerInfo?.id
                     }];
+                    console.log(`[DEBUG] Added remote stream from ${otherId}. Total streams: ${updated.length}`);
+                    return updated;
                 });
             };
 
@@ -117,6 +119,44 @@ export const useWebRTC = (
 
             peerRefs.current[otherId] = peer;
             return peer;
+        };
+
+        const removeRemoteStreamsForSocketId = (socketId: string) => {
+            console.log(`[DEBUG] Attempting to remove streams for socket: ${socketId}`);
+
+            setRemoteStreams((prev) => {
+                console.log(`[DEBUG] Before removal - Total streams: ${prev.length}`);
+
+                const next = prev.filter((streamInfo) => {
+                    const streamSocketId = streamToSocketIdRef.current[streamInfo.stream.id];
+
+                    if (streamSocketId === socketId) {
+                        console.log(`[DEBUG] Removing stream ${streamInfo.stream.id} (socket: ${socketId})`);
+                        // Stop all tracks in this stream
+                        streamInfo.stream.getTracks().forEach((track) => {
+                            console.log(`[DEBUG] Stopping ${track.kind} track`);
+                            track.stop();
+                        });
+                        delete streamToSocketIdRef.current[streamInfo.stream.id];
+                        return false;
+                    }
+                    return true;
+                });
+
+                console.log(`[DEBUG] After removal - Total streams: ${next.length}`);
+                return next;
+            });
+        };
+
+        const closePeerConnection = (socketId: string) => {
+            console.log(`[DEBUG] Closing peer connection for socket: ${socketId}`);
+            const peer = peerRefs.current[socketId];
+            if (peer) {
+                peer.close();
+                delete peerRefs.current[socketId];
+                console.log(`[DEBUG] Peer connection closed and removed`);
+            }
+            delete playerInfoMapRef.current[socketId];
         };
 
         socketRef.current.on('user-joined', async (id: string) => {
@@ -178,6 +218,13 @@ export const useWebRTC = (
             });
         });
 
+        // Listen for user disconnect
+        socketRef.current.on('user-disconnected', async (socketId: string) => {
+            console.log(`[WEBRTC DISCONNECT] Received user-disconnected for socket: ${socketId}`);
+            removeRemoteStreamsForSocketId(socketId);
+            closePeerConnection(socketId);
+        });
+
         socketRef.current.on('signal', async ({ from, data }: { from: string; data: any }) => {
             console.log(`Signal from ${from}:`, data.type || 'ice-candidate');
 
@@ -201,6 +248,7 @@ export const useWebRTC = (
         });
 
         return () => {
+            console.log('[WebRTC] Cleaning up');
             socketRef.current?.disconnect();
             Object.values(peerRefs.current).forEach((p) => p.close());
         };
