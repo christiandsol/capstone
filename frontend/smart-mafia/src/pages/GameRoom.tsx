@@ -312,7 +312,7 @@ export default function GameRoom({ playerName }: GameProps) {
           </div>
         )}
 
-        {isStarted && gameHasStarted && (
+        {(
           <VoiceControls
             isListening={isListening}
             onStart={startVoice}

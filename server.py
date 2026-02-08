@@ -32,6 +32,7 @@ class MafiaGame:
         self.mafia_count = None
         self.doctor_count = None
         self.game_winner = None
+        self.pending_code = -1
 
     def valid_signal(self, signal):
         return signal and signal.get("action") in self.expected_signals
@@ -81,6 +82,7 @@ class MafiaGame:
         for player_data in self.players.values():
             player_data["ready"] = True
             player_data["restart"] = False
+            player_data["voiceCommand"] = False
             player_data["head"] = "up"
             player_data["vote"] = None
             player_data["kill"] = None
@@ -97,6 +99,7 @@ class MafiaGame:
         self.mafia_count = None
         self.doctor_count = None
         self.game_winner = None
+        self.pending_code = -1
         
         # Back to lobby
         self.state = "LOBBY"
@@ -279,28 +282,29 @@ class MafiaGame:
                     role = "doctor"
                 await send_json(ws, name, role, None)
 
-
     async def update(self):
         state_before = self.state
         
         if self.state == "LOBBY" and self.check_everyone_ready():
             print(f"[DEBUG] All {len(self.players)} players ready! Starting game...")
-            # Assign roles randomly based on player count
-            player_names = list(self.players.keys())
-            num_players = len(player_names)
+            if self.pending_code == 2:
+                self.pending_code = -1
+                # Assign roles randomly based on player count
+                player_names = list(self.players.keys())
+                num_players = len(player_names)
             
-            if num_players >= 7:
-                self.mafia_count = 2
-                self.doctor_count = 2
-                self.mafia_name_one, self.mafia_name_two, self.doctor_name_one, self.doctor_name_two = random.sample(player_names, 4)
-            else:
-                self.mafia_count = 1
-                self.doctor_count = 1
-                self.mafia_name_one, self.doctor_name_one = random.sample(player_names, 2)
+                if num_players >= 7:
+                    self.mafia_count = 2
+                    self.doctor_count = 2
+                    self.mafia_name_one, self.mafia_name_two, self.doctor_name_one, self.doctor_name_two = random.sample(player_names, 4)
+                else:
+                    self.mafia_count = 1
+                    self.doctor_count = 1
+                    self.mafia_name_one, self.doctor_name_one = random.sample(player_names, 2)
                 
-            print(f"[DEBUG] Assigned roles: Mafia={self.mafia_count}, Doctor={self.doctor_count}")
-            self.state = "ASSIGN"
-            self.expected_signals = set()
+                print(f"[DEBUG] Assigned roles: Mafia={self.mafia_count}, Doctor={self.doctor_count}")
+                self.state = "ASSIGN"
+                self.expected_signals = set()
 
         if self.state == "ASSIGN":
             await self.assign_player()
@@ -311,7 +315,7 @@ class MafiaGame:
 # and self.check_heads_down([])
         if self.state == "HEADSDOWN":
             self.state = "MAFIAVOTE"
-            self.expected_signals = {"headUp", "headDown", "voiceCommand", "targeted"}
+            self.expected_signals = {"headUp", "headDown", "targeted"}
             print("MOVING ON TO MAFIA VOTE STAGE")
             if self.mafia_count == 1:
                 if self.players[self.mafia_name_one]["alive"] == True:
@@ -399,10 +403,15 @@ class MafiaGame:
                 await self.broadcast_restart_status()
                 return
             
-            self.state = "VOTE"
-            self.expected_signals = {"voiceCommand", "targeted"}
+            self.state = "PREVOTE"
+            self.expected_signals = {"targeted"}
             print("[DEBUG] Moving to day voting stage")
-            await self.broadcast_vote()
+
+        if self.state == "PREVOTE":
+            if self.pending_code == 3:
+                self.pending_code = -1
+                self.state = "VOTE"
+                await self.broadcast_vote()
 
         if self.state == "VOTE" and self.everyone_voted():
             voted_out = self.handle_vote()
@@ -465,16 +474,16 @@ async def handler(ws: WebSocketServerProtocol):
                 continue
             
             # Handle control messages (voice commands from frontend)
-            if msg.get("action") == "control":
-                target = msg.get("target")
-                ctrl_code = None
-                ctrl_name = None
+            if msg.get("action") == "voiceCommand":
+                code = msg.get("target")
                 
-                if isinstance(target, dict):
-                    ctrl_code = target.get("code")
-                    ctrl_name = target.get("name")
+                if isinstance(code, str) and code.isnumeric():
+                    code = int(code)
                 
-                print(f"[VOICE_COMMAND] Received: player={player_name}, code={ctrl_code}, action={ctrl_name}")
+                async with lock:
+                    game.pending_code = code
+                    print(f"[VOICE_COMMAND] Received: player={player_name}, code={2}")
+                    await game.update()
                 continue
             
             # Handle setup message
@@ -508,6 +517,7 @@ async def handler(ws: WebSocketServerProtocol):
                         "setup": True,
                         "ready": False,
                         "restart": False,
+                        "voiceCommand": False,
                         "head": "up",
                         "vote": None,
                         "kill": None,
@@ -550,7 +560,7 @@ async def handler(ws: WebSocketServerProtocol):
                         # Try to restart the game
                         await game.update()
                 continue
-            
+
             # Handle other game signals
             if player_name and game.valid_signal(msg):
                 action = msg["action"]
@@ -565,7 +575,7 @@ async def handler(ws: WebSocketServerProtocol):
                         player_data["head"] = "up"
                     elif action == "headDown":
                         player_data["head"] = "down"
-                    elif action == "voiceCommand" or action == "targeted":
+                    elif action == "targeted":
                         target = msg.get("target")
                         print(f"[DEBUG], received target signal with target: {target}, of type: {type(target)}")
 

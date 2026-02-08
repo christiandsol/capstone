@@ -192,13 +192,13 @@ export const useGameSocket = (
         }
     };
 
-    const sendVoiceCommand = (command: number) => {
+    const sendVoiceCommand = (code: number) => {
         if (gameSocketRef.current?.readyState === WebSocket.OPEN) {
             gameSocketRef.current.send(JSON.stringify({
                 action: 'voiceCommand',
-                target: command
+                target: code
             }));
-            console.log('[Game] Sent voice command:', command);
+            console.log('[Game] Sent voice command code:', code);
         }
     };
 
