@@ -53,12 +53,7 @@ class MafiaGame:
         alive_players = [name for name, data in self.players.items() if data["alive"]]
         
         # Check if any mafia are alive
-        mafia_alive = False
-        if self.mafia_name_one and self.players[self.mafia_name_one]["alive"]:
-            mafia_alive = True
-        if self.mafia_name_two and self.players[self.mafia_name_two]["alive"]:
-            mafia_alive = True
-        
+        mafia_alive = self.is_alive(self.mafia_name_one) or self.is_alive(self.mafia_name_two)
         # If no mafia alive, civilians win
         if not mafia_alive:
             return "civilians"
@@ -69,8 +64,8 @@ class MafiaGame:
         
         # If mafia >= civilians, mafia wins
         alive_mafia_count = sum([
-            1 if self.mafia_name_one and self.players[self.mafia_name_one]["alive"] else 0,
-            1 if self.mafia_name_two and self.players[self.mafia_name_two]["alive"] else 0
+            1 if self.is_alive(self.mafia_name_one) else 0,
+            1 if self.is_alive(self.mafia_name_two) else 0
         ])
         
         if alive_mafia_count >= alive_civilians:
@@ -136,18 +131,17 @@ class MafiaGame:
     def mafia_kill(self):
         if self.mafia_count == 1:
             print(f"[DEBUG] pick something")
-            if self.players[self.mafia_name_one]["alive"] and self.players[self.mafia_name_one]["kill"]:
+            if self.is_alive(self.mafia_name_one) and self.players[self.mafia_name_one]["kill"]:
                 kill = self.players[self.mafia_name_one]["kill"]
                 self.players[self.mafia_name_one]["kill"] = None
                 return kill
-            if self.mafia_name_two != None:
-                if self.players[self.mafia_name_two]["alive"] and self.players[self.mafia_name_two]["kill"]:
+            elif self.is_alive(self.mafia_name_two) and self.players[self.mafia_name_two]["kill"]:
                     kill = self.players[self.mafia_name_two]["kill"]
                     self.players[self.mafia_name_two]["kill"] = None
                     return kill
             return None
         elif self.mafia_count == 2:
-            if self.players[self.mafia_name_one]["alive"] and self.players[self.mafia_name_one]["kill"] and self.players[self.mafia_name_one]["alive"] and self.players[self.mafia_name_two]["kill"]:
+            if self.is_alive(self.mafia_name_one) and self.players[self.mafia_name_one]["kill"] and self.is_alive(self.mafia_name_two) and self.players[self.mafia_name_two]["kill"]:
                 if self.players[self.mafia_name_one]["kill"] == self.players[self.mafia_name_two]["kill"]:
                     kill = self.players[self.mafia_name_one]["kill"]
                     self.players[self.mafia_name_one]["kill"] = None
@@ -157,18 +151,17 @@ class MafiaGame:
 
     def doctor_save(self):
         if self.doctor_count == 1:
-            if self.players[self.doctor_name_one]["alive"] and self.players[self.doctor_name_one]["save"]:
+            if self.is_alive(self.doctor_name_one) and self.players[self.doctor_name_one]["save"]:
                 save = self.players[self.doctor_name_one]["save"]
                 self.players[self.doctor_name_one]["save"] = None
                 return save
-            if self.doctor_name_two != None:
-                if self.players[self.doctor_name_two]["alive"] and self.players[self.doctor_name_two]["save"]:
-                    save = self.players[self.doctor_name_two]["save"]
-                    self.players[self.doctor_name_two]["save"] = None
+            elif self.is_alive(self.doctor_name_two) and self.players[self.doctor_name_two]["save"]:
+                save = self.players[self.doctor_name_two]["save"]
+                self.players[self.doctor_name_two]["save"] = None
                 return save
             return None
         elif self.doctor_count == 2:
-            if self.doctor_name_one and self.players[self.doctor_name_one]["save"] and self.doctor_name_two and self.players[self.doctor_name_two]["save"]:
+            if self.is_alive(self.doctor_name_one) and self.players[self.doctor_name_one]["save"] and self.is_alive(self.doctor_name_two) and self.players[self.doctor_name_two]["save"]:
                 if self.players[self.doctor_name_one]["save"] == self.players[self.doctor_name_two]["save"]:
                     save = self.players[self.doctor_name_one]["save"]
                     self.players[self.doctor_name_one]["save"] = None
@@ -199,6 +192,17 @@ class MafiaGame:
             data["vote"] = None
 
         return winners
+
+    def check_role_counts(self):
+        if self.mafia_count == 2:
+            if self.is_alive(self.mafia_name_one) == False or self.is_alive(self.mafia_name_two) == False:
+                self.mafia_count = 1
+        if self.doctor_count == 2:
+            if self.is_alive(self.doctor_name_one) == False or self.is_alive(self.doctor_name_two) == False:
+                self.doctor_count = 1
+
+    def is_alive(self, name: str | None) -> bool:
+        return bool(name) and name in self.players and self.players[name].get("alive")
 
     async def broadcast(self, action, target=None):
         for ws, name in self.clients.items():
@@ -313,41 +317,66 @@ class MafiaGame:
             if self.mafia_count == 1:
                 if self.players[self.mafia_name_one]["alive"] == True:
                     await self.request_action(self.mafia_name_one, "kill")
+                    return
                 elif self.players[self.mafia_name_two]["alive"] == True and self.mafia_name_two != None:
                     await self.request_action(self.mafia_name_two, "kill")
+                    return
             elif self.mafia_count == 2:
                 await asyncio.gather(
                     self.request_action(self.mafia_name_one, "kill"), 
                     self.request_action(self.mafia_name_two, "kill")
                 )
+                return
                 
         if self.state == "MAFIAVOTE":
  #           if self.check_heads_down([self.mafia_name_one, self.mafia_name_two]):
                 kill = self.mafia_kill()
+                if kill == None and self.mafia_count == 2 and self.players[self.mafia_name_one]["kill"] != None and self.players[self.mafia_name_two]["kill"] != None:
+                    print(f"[DEBUG] voted for diff people, try again")
+                    self.players[self.mafia_name_one]["kill"] = None
+                    self.players[self.mafia_name_two]["kill"] = None
+                    await asyncio.gather(
+                    self.request_action(self.mafia_name_one, "kill"), 
+                    self.request_action(self.mafia_name_two, "kill")
+                    )
+                    return
                 if kill != None:
                     print(f"[DEBUG] kill successful")      
                     self.last_killed = kill
-                    self.state = "DOCTORVOTE" if (self.players[self.doctor_name_one]["alive"] or (self.doctor_name_two != None and self.players[self.doctor_name_one]["alive"])) else "NARRATE"
+                    self.state = "DOCTORVOTE" if (self.players[self.doctor_name_one]["alive"] or (self.doctor_name_two != None and self.players[self.doctor_name_two]["alive"])) else "NARRATE"
                     if self.state == "DOCTORVOTE":
                         if self.doctor_count == 1:
                             if self.players[self.doctor_name_one]["alive"] == True:
                                 await self.request_action(self.doctor_name_one, "save")
+                                return
                             elif self.players[self.doctor_name_two]["alive"] == True and self.doctor_name_two != None:
                                 await self.request_action(self.doctor_name_two, "save")
+                                return
                         elif self.doctor_count == 2:
                             await asyncio.gather(
                                 self.request_action(self.doctor_name_one, "save"), 
                                 self.request_action(self.doctor_name_two, "save")
                             )
+                            return
 
         if self.state == "DOCTORVOTE":
  #           if self.check_heads_down([self.doctor_name_one, self.doctor_name_two]):
                 save = self.doctor_save()
-                if save:
+                if save == None and self.doctor_count == 2 and self.players[self.doctor_name_one]["save"] != None and self.players[self.doctor_name_two]["save"] != None:
+                    print(f"[DEBUG] voted for diff people, try again")
+                    self.players[self.doctor_name_one]["save"] = None
+                    self.players[self.doctor_name_two]["save"] = None
+                    await asyncio.gather(
+                    self.request_action(self.doctor_name_one, "save"), 
+                    self.request_action(self.doctor_name_two, "save")
+                    )
+                    return
+                if save != None:
                     self.last_saved = save
                     if self.last_saved != self.last_killed:
-                        print(f"[DEBUG] save failed") 
+                        print(f"[DEBUG] save failed")
                         self.players[self.last_killed]["alive"] = False
+                        self.check_role_counts()
                     self.state = "NARRATE"
 
         if self.state == "NARRATE":
@@ -356,7 +385,8 @@ class MafiaGame:
                 "killed": self.last_killed,
                 "saved": self.last_saved
             })
-            
+            self.last_saved = None
+            self.last_killed = None
             # Check if game is over after night
             winner = self.check_game_over()
             if winner:
@@ -380,11 +410,15 @@ class MafiaGame:
             if len(voted_out) != 1:
                 print(f"[DEBUG] Vote tied between {[player for player in voted_out]}")
                 await self.broadcast("vote_result_tie", voted_out)
-                await self.broadcast_vote()
+                self.state = "HEADSDOWN"
+                self.expected_signals = {"headUp", "headDown"}
+                print("[DEBUG] Moving back to night phase")
+                await self.broadcast("heads_down", None)
                 return
             
             print(f"[DEBUG] Player voted out: {voted_out[0]}")
             self.players[voted_out[0]]["alive"] = False
+            self.check_role_counts()
             await self.broadcast("vote_result", voted_out)
             
             # Check if game is over after vote
@@ -395,7 +429,7 @@ class MafiaGame:
                 self.expected_signals = set()
                 await self.broadcast("game_over", {
                     "winner": winner,
-                    "mafia": [self.mafia_name_one, self.mafia_name_two] if self.mafia_count == 2 else [self.mafia_name_one]
+                    "mafia": [self.mafia_name_one, self.mafia_name_two] if len(self.players) >= 7 else [self.mafia_name_one]
                 })
                 await self.broadcast_restart_status()
                 return
@@ -574,6 +608,7 @@ async def handler(ws: WebSocketServerProtocol):
                         del game.name_to_player_id[player_name]
                     del game.players[player_name]
                 
+                game.check_role_counts()
                 # Broadcast updated lobby status if still in lobby
                 if game.state == "LOBBY":
                     await game.broadcast_lobby_status()
@@ -583,7 +618,7 @@ async def handler(ws: WebSocketServerProtocol):
             print(f"[DEBUG] Player {player_name} removed from game")
 
 async def main():
-    async with websockets.serve(handler, HOST, PORT):
+    async with websockets.serve(handler, HOST, PORT, ping_interval=30,ping_timeout=30):
         print(f"WebSocket server running on {PORT}")
         await asyncio.Future()
 

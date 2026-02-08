@@ -8,7 +8,7 @@ SERVER_PORT = 5050
 async def debug_player(player_name):
     uri = f"ws://{SERVER_IP}:{SERVER_PORT}"
     
-    async with websockets.connect(uri) as ws:
+    async with websockets.connect(uri, ping_interval = 30, ping_timeout = 30) as ws:
         # Send setup
         await ws.send(json.dumps({
             "action": "setup",
