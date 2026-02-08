@@ -79,7 +79,7 @@ class MafiaGame:
         
         # Reset all player states
         for player_data in self.players.values():
-            player_data["ready"] = False
+            player_data["ready"] = True
             player_data["restart"] = False
             player_data["head"] = "up"
             player_data["vote"] = None
@@ -212,7 +212,6 @@ class MafiaGame:
         """Broadcast current lobby status to all players"""
         ready_count = sum(1 for p in self.players.values() if p["ready"])
         total_count = len(self.players)
-        
         for ws, name in self.clients.items():
             await send_json(ws, name, "lobby_status", {
                 "ready_count": ready_count,
