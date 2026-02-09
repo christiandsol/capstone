@@ -45,12 +45,15 @@ async def handle_debug_vote(ws, name):
 
 async def handle_vote(ws, imu, recognizer, name):
     """
-    Handles the voting
+    Handles the voting using gesture recognition (gesturetwo.py)
     """
     while True:
         print("\n[Pi] Ready to record gesture. Move the BerryIMU to vote (1-8)...")
-        print("[Pi] Press Enter to start recording, or 'q' to quit: ", end='')
+        print("[Pi] Press Enter to start recording (or 'q' to skip): ", end='')
         cmd = input().strip().lower()
+        if cmd == 'q':
+            print("[Pi] Skipping vote...")
+            return
         
         # Record gesture sequence (1 second)
         print("[Pi] Recording gesture... move the BerryIMU now.")
@@ -107,20 +110,19 @@ async def rpi_helper(ws, name, imu, recognizer):
                 print(f"[DEBUG] received role: {action}")
                 continue
 
-                # Only act when server asks you to
-            # if action in ["vote", "kill", "save"]:
-            #     if action == "vote":
-            #         await handle_vote(ws, imu, recognizer, name)
-            #     elif action == "kill" or action == "save":
-            #         await handle_vote(ws, imu, recognizer, name)
-        
-            # server tells us it's our turn to vote
-            print("[Pi] Are you running on your raspberry pi? (y for raspberry pi, n for local debugging): ", end='')
-            cmd = input().strip().lower()
-            if cmd == 'y':
+            # Automatically respond when server requests an action
+            if action in ["vote", "kill", "save"]:
+                print(f"[Pi] Server requested: {action}")
+                if action == "vote":
+                    print("[Pi] It's voting time! Recording gesture...")
+                elif action == "kill":
+                    print("[Pi] Mafia vote requested! Recording gesture...")
+                elif action == "save":
+                    print("[Pi] Doctor vote requested! Recording gesture...")
+                
+                # Use gesture recognition (gesturetwo.py)
                 await handle_vote(ws, imu, recognizer, name)
-            else:
-                await handle_debug_vote(ws, name)
+                continue
     except websockets.exceptions.ConnectionClosedError:
         print(f"[DEBUG] Connection closed unexpectedly")
     except Exception as e:
