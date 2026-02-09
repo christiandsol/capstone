@@ -10,20 +10,11 @@ PORT = 5050
 MAX_PLAYERS = 8
 
 class MafiaGame:
-    async def send_status(self, player_name: str, message: str):
-            # Send a status message to a specific player
-            ws = None
-            for w, n in self.clients.items():
-                if n == player_name:
-                    ws = w
-                    break
-            if ws:
-                await send_json(ws, player_name, "status", message)
-
+    
     async def broadcast_status(self, message: str):
-            # Send a status message to all players
-            for ws, name in self.clients.items():
-                await send_json(ws, name, "status", message)
+        # Send a status message to all players
+        for ws, name in self.clients.items():
+            await send_json(ws, name, "status", message)
     def __init__(self):
         self.state = "LOBBY"
         self.expected_signals = {"setup"}

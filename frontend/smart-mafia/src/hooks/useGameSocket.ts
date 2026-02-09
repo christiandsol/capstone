@@ -108,6 +108,11 @@ export const useGameSocket = (
                         );
                     }
 
+                    // Handle custom status messages from backend
+                    if (data.action === 'status') {
+                        onStatusChange(data.target);
+                    }
+
                     if (data.action === 'restart_status') {
                         setRestartStatus(data.target);
                         const { restart_count, total_count } = data.target;
