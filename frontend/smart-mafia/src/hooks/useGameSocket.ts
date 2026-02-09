@@ -26,6 +26,7 @@ interface UseGameSocketReturn {
     lobbyStatus: LobbyStatus | null;
     restartStatus: RestartStatus | null;
     gameOverData: GameOverData | null;
+    gameStage: string | null;
     sendHeadPosition: (position: string) => void;
     setCurrentHead: (position: string) => void;
     sendVoiceCommand: (command: number) => void;
@@ -44,6 +45,7 @@ export const useGameSocket = (
     const [lobbyStatus, setLobbyStatus] = useState<LobbyStatus | null>(null);
     const [restartStatus, setRestartStatus] = useState<RestartStatus | null>(null);
     const [gameOverData, setGameOverData] = useState<GameOverData | null>(null);
+    const [gameStage, setGameStage] = useState<string | null>(null);
     const hasSetupRef = useRef(false);
     const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -126,6 +128,11 @@ export const useGameSocket = (
                         setGameOverData(data.target);
                         const winner = data.target.winner === 'mafia' ? 'MAFIA' : 'CIVILIANS';
                         onStatusChange(`GAME OVER! ${winner} WIN!`);
+                    }
+
+                    if (data.action === 'game_state') {
+                        setGameStage(data.target.state);
+                        console.log('[Game] Game stage:', data.target.state);
                     }
 
                     if (data.action === 'night_result') {
@@ -228,6 +235,7 @@ export const useGameSocket = (
         lobbyStatus,
         restartStatus,
         gameOverData,
+        gameStage,
         sendHeadPosition,
         setCurrentHead,
         sendVoiceCommand,

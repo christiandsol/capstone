@@ -5,6 +5,7 @@ import { useWebRTC } from '../hooks/useWebRTC';
 import { useMediaStream } from '../hooks/useMediaStream';
 import { useHeadDetection } from '../hooks/useHeadDetection';
 import { StatusDisplay } from '../components/StatusDisplay';
+import { GameStageDisplay } from '../components/GameStageDisplay';
 import { VoiceControls } from '../components/VoiceControls';
 import { VideoControls } from '../components/VideoControls';
 import { RemoteVideo } from '../components/RemoteVideo';
@@ -27,6 +28,7 @@ export default function GameRoom({ playerName }: GameProps) {
     lobbyStatus,
     restartStatus,
     gameOverData,
+    gameStage,
     sendHeadPosition,
     setCurrentHead,
     sendVoiceCommand,
@@ -124,6 +126,9 @@ export default function GameRoom({ playerName }: GameProps) {
           headPosition={headPosition}
           isListening={isListening}
         />
+
+        {/* Game Stage Display */}
+        {gameStage && <GameStageDisplay gameStage={gameStage} />}
 
         {/* Game Over Screen */}
         {gameIsOver && gameOverData && (

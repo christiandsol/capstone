@@ -1,8 +1,8 @@
 export const VOICE_COMMANDS: { [key: string]: number } = {
-    "ready to start": 1,
-    "ready start": 1,
-    "start game": 1,
-    "start": 1,
+    // "ready to start": 1,
+    // "ready start": 1,
+    // "start game": 1,
+    // "start": 1,
     "assign players": 2,
     "assign play": 2,
     "find players": 2,

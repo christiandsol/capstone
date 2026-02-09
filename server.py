@@ -10,6 +10,20 @@ PORT = 5050
 MAX_PLAYERS = 8
 
 class MafiaGame:
+    async def send_status(self, player_name: str, message: str):
+            # Send a status message to a specific player
+            ws = None
+            for w, n in self.clients.items():
+                if n == player_name:
+                    ws = w
+                    break
+            if ws:
+                await send_json(ws, player_name, "status", message)
+
+    async def broadcast_status(self, message: str):
+            # Send a status message to all players
+            for ws, name in self.clients.items():
+                await send_json(ws, name, "status", message)
     def __init__(self):
         self.state = "LOBBY"
         self.expected_signals = {"setup"}
@@ -287,6 +301,7 @@ class MafiaGame:
         
         if self.state == "LOBBY" and self.check_everyone_ready():
             print(f"[DEBUG] All {len(self.players)} players ready! Starting game...")
+            await self.broadcast_status(f"All {len(self.players)} players ready! Starting game...")
             if self.pending_code == 2:
                 self.pending_code = -1
                 # Assign roles randomly based on player count
@@ -303,6 +318,8 @@ class MafiaGame:
                     self.mafia_name_one, self.doctor_name_one = random.sample(player_names, 2)
                 
                 print(f"[DEBUG] Assigned roles: Mafia={self.mafia_count}, Doctor={self.doctor_count}")
+                await self.broadcast_status(f"Assigned roles: Mafia={self.mafia_count}, Doctor={self.doctor_count}")
+
                 self.state = "ASSIGN"
                 self.expected_signals = set()
 
@@ -312,11 +329,14 @@ class MafiaGame:
             self.state = "HEADSDOWN"
             self.expected_signals = {"headUp", "headDown"}
             print("Moving on to mafia stage, everyone put head down please")
+            await self.broadcast_status("Moving on to mafia stage, everyone put head down please")
+
 # and self.check_heads_down([])
         if self.state == "HEADSDOWN":
             self.state = "MAFIAVOTE"
             self.expected_signals = {"headUp", "headDown", "targeted"}
             print("MOVING ON TO MAFIA VOTE STAGE")
+            await self.broadcast_status("MOVING ON TO MAFIA VOTE STAGE")
             if self.mafia_count == 1:
                 if self.players[self.mafia_name_one]["alive"] == True:
                     await self.request_action(self.mafia_name_one, "kill")
@@ -336,6 +356,8 @@ class MafiaGame:
                 kill = self.mafia_kill()
                 if kill == None and self.mafia_count == 2 and self.players[self.mafia_name_one]["kill"] != None and self.players[self.mafia_name_two]["kill"] != None:
                     print(f"[DEBUG] voted for diff people, try again")
+                    await self.broadcast_status("Mafia voted for different people, try again.")
+
                     self.players[self.mafia_name_one]["kill"] = None
                     self.players[self.mafia_name_two]["kill"] = None
                     await asyncio.gather(
@@ -367,6 +389,7 @@ class MafiaGame:
                 save = self.doctor_save()
                 if save == None and self.doctor_count == 2 and self.players[self.doctor_name_one]["save"] != None and self.players[self.doctor_name_two]["save"] != None:
                     print(f"[DEBUG] voted for diff people, try again")
+                    await self.broadcast_status("Doctor voted for different people, try again.")
                     self.players[self.doctor_name_one]["save"] = None
                     self.players[self.doctor_name_two]["save"] = None
                     await asyncio.gather(
@@ -378,12 +401,14 @@ class MafiaGame:
                     self.last_saved = save
                     if self.last_saved != self.last_killed:
                         print(f"[DEBUG] save failed")
+                        await self.broadcast_status("Doctor save failed.")
                         self.players[self.last_killed]["alive"] = False
                         self.check_role_counts()
                     self.state = "NARRATE"
 
         if self.state == "NARRATE":
             print("[DEBUG] Narrating night results...")
+            await self.broadcast_status("Narrating night results...")
             await self.broadcast("night_result", {
                 "killed": self.last_killed,
                 "saved": self.last_saved
@@ -406,6 +431,7 @@ class MafiaGame:
             self.state = "PREVOTE"
             self.expected_signals = {"targeted"}
             print("[DEBUG] Moving to day voting stage")
+            await self.broadcast_status("Moving to day voting stage.")
 
         if self.state == "PREVOTE":
             if self.pending_code == 3:
@@ -417,14 +443,17 @@ class MafiaGame:
             voted_out = self.handle_vote()
             if len(voted_out) != 1:
                 print(f"[DEBUG] Vote tied between {[player for player in voted_out]}")
+                await self.broadcast_status(f"Vote tied between {[player for player in voted_out]}")
                 await self.broadcast("vote_result_tie", voted_out)
                 self.state = "HEADSDOWN"
                 self.expected_signals = {"headUp", "headDown"}
                 print("[DEBUG] Moving back to night phase")
+                await self.broadcast_status("Moving back to night phase.")
                 await self.broadcast("heads_down", None)
                 return
             
             print(f"[DEBUG] Player voted out: {voted_out[0]}")
+            await self.broadcast_status(f"Player voted out: {voted_out[0]}")
             self.players[voted_out[0]]["alive"] = False
             self.check_role_counts()
             await self.broadcast("vote_result", voted_out)
@@ -445,16 +474,19 @@ class MafiaGame:
             self.state = "HEADSDOWN"
             self.expected_signals = {"headUp", "headDown"}
             print("[DEBUG] Moving back to night phase")
+            await self.broadcast_status("Moving back to night phase.")
             await self.broadcast("heads_down", voted_out)
             
         if self.state == "GAMEOVER" and self.check_everyone_wants_restart():
             print("[DEBUG] All players want to restart! Restarting game...")
+            await self.broadcast_status("All players want to restart! Restarting game...")
             self.reset_game_state()
             await self.broadcast_lobby_status()
         
         # If state changed, recursively call update to continue processing
         if self.state != state_before:
             print(f"[DEBUG] State changed from {state_before} to {self.state}, continuing update...")
+            await self.broadcast_status(f"State changed from {state_before} to {self.state}, continuing update...")
             await self.update()
 
 
