@@ -96,18 +96,27 @@ async def handle_vote(ws, imu, recognizer, name):
         break
 
 async def rpi_helper(ws, name, imu, recognizer):
+    print("[Pi] Are you running on your raspberry pi? (y for raspberry pi, n for local debugging): ", end='')
+    cmd = input().strip().lower()
     try:
         async for message in ws:
             msg = parse_json(message)
             if not msg:
                 continue
+            print(f"[DEBUG]: {msg}")
             action = msg.get("action")
             if action in ["civilian", "mafia", "doctor"]:
                 role = action
                 print(f"[DEBUG] received role: {action}")
                 continue
 
-                # Only act when server asks you to
+            if action == "disconnect":
+                print("[DEBUG] Disconnecting...")
+                return
+            if action == "restart_status":
+                print("[DEBUG] Received restart, restarting game, your role may change")
+                continue
+            # Only act when server asks you to
             # if action in ["vote", "kill", "save"]:
             #     if action == "vote":
             #         await handle_vote(ws, imu, recognizer, name)
@@ -115,8 +124,6 @@ async def rpi_helper(ws, name, imu, recognizer):
             #         await handle_vote(ws, imu, recognizer, name)
         
             # server tells us it's our turn to vote
-            print("[Pi] Are you running on your raspberry pi? (y for raspberry pi, n for local debugging): ", end='')
-            cmd = input().strip().lower()
             if cmd == 'y':
                 await handle_vote(ws, imu, recognizer, name)
             else:

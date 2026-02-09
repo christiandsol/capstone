@@ -4,13 +4,21 @@ import { useVoiceRecognition } from '../hooks/useVoiceRecognition';
 import { useWebRTC } from '../hooks/useWebRTC';
 import { useMediaStream } from '../hooks/useMediaStream';
 import { useHeadDetection } from '../hooks/useHeadDetection';
+import { useNotifications } from '../hooks/useNotifications';
 import { StatusDisplay } from '../components/StatusDisplay';
 import { VoiceControls } from '../components/VoiceControls';
 import { VideoControls } from '../components/VideoControls';
 import { RemoteVideo } from '../components/RemoteVideo';
+import { Notification } from '../components/Notifications';
 
 type GameProps = {
   playerName: string;
+};
+
+const winnerText: Record<string, string> = {
+  mafia: "MAFIA WINS!",
+  civilians: "CIVILIANS WIN!",
+  no_one: "NO ONE WON",
 };
 
 export default function GameRoom({ playerName }: GameProps) {
@@ -21,6 +29,10 @@ export default function GameRoom({ playerName }: GameProps) {
   const [hasClickedReady, setHasClickedReady] = useState(false);
   const [hasClickedRestart, setHasClickedRestart] = useState(false);
 
+  // Initialize notifications
+  const { notifications, removeNotification, notify } = useNotifications();
+
+  // Pass notify to useGameSocket
   const {
     role,
     playerId,
@@ -32,7 +44,7 @@ export default function GameRoom({ playerName }: GameProps) {
     sendVoiceCommand,
     sendReady,
     sendRestart
-  } = useGameSocket(setStatus, playerName);
+  } = useGameSocket(setStatus, playerName, notify.error);
 
   // Voice recognition
   const { isListening, start: startVoice, stop: stopVoice } = useVoiceRecognition(
@@ -69,6 +81,9 @@ export default function GameRoom({ playerName }: GameProps) {
       const newMutedState = !isMuted;
       setIsMuted(newMutedState);
       setStatus(newMutedState ? 'Microphone OFF' : 'Microphone ON');
+
+      // Show notification
+      notify.info(newMutedState ? 'Microphone OFF' : 'Microphone ON');
     }
   };
 
@@ -81,23 +96,24 @@ export default function GameRoom({ playerName }: GameProps) {
       await startCamera();
     }
     setIsStarted(true);
+    notify.success('Stream started!');
   };
 
   const handleReady = () => {
     sendReady();
     setHasClickedReady(true);
+    notify.success('Marked as ready!');
   };
 
   const handleRestart = () => {
     sendRestart();
     setHasClickedRestart(true);
+    notify.success('Voted to play again!');
   };
 
-  // Check if game has started (role is assigned)
   const gameHasStarted = role !== null && !gameOverData;
   const gameIsOver = gameOverData !== null;
 
-  // Reset UI state when returning to lobby after restart
   if (!gameIsOver && (hasClickedReady || hasClickedRestart)) {
     setHasClickedReady(false);
     setHasClickedRestart(false);
@@ -105,6 +121,18 @@ export default function GameRoom({ playerName }: GameProps) {
 
   return (
     <div style={{ padding: "0", fontFamily: "system-ui, sans-serif", background: "#1a1a1a", minHeight: "100vh", color: "white" }}>
+      {/* Render all notifications */}
+      {notifications.map((notification) => (
+        <Notification
+          key={notification.id}
+          id={notification.id}
+          message={notification.message}
+          type={notification.type}
+          duration={notification.duration}
+          onDismiss={removeNotification}
+        />
+      ))}
+
       {/* Game Room Heading */}
       <div style={{
         textAlign: 'center',
@@ -147,7 +175,7 @@ export default function GameRoom({ playerName }: GameProps) {
               color: gameOverData.winner === 'mafia' ? '#ff4444' : '#00ff00',
               textShadow: `0 0 20px ${gameOverData.winner === 'mafia' ? '#ff4444' : '#00ff00'}`
             }}>
-              {gameOverData.winner === 'mafia' ? 'MAFIA WINS!' : 'CIVILIANS WIN!'}
+              {winnerText[gameOverData.winner]}
             </h1>
 
             <div style={{ marginTop: '20px', fontSize: '18px' }}>
@@ -194,7 +222,7 @@ export default function GameRoom({ playerName }: GameProps) {
                         fontSize: '12px',
                         color: wantsRestart ? '#00ff00' : '#888'
                       }}>
-                        {wantsRestart ? 'âœ" Ready' : 'Waiting...'}
+                        {wantsRestart ? 'Ready' : 'Waiting...'}
                       </span>
                     </div>
                   ))}
@@ -272,7 +300,7 @@ export default function GameRoom({ playerName }: GameProps) {
                     fontSize: '12px',
                     color: isReady ? '#00ff00' : '#888'
                   }}>
-                    {isReady ? 'âœ" READY' : 'Waiting...'}
+                    {isReady ? 'READY' : 'Waiting...'}
                   </span>
                 </div>
               ))}

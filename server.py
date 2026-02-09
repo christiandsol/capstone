@@ -171,7 +171,7 @@ class MafiaGame:
                 return False
         return True
 
-    def handle_vote(self):
+    def handle_vote(self) -> List[int]:
         votes = {}
         for name, data in self.players.items():
             if data["alive"] and data["vote"]:
@@ -190,8 +190,20 @@ class MafiaGame:
         return winners
 
     async def broadcast(self, action, target=None):
+        for ws, name in list(self.clients.items()):
+            try:
+                await send_json(ws, name, action, target)
+            except websockets.exceptions.ConnectionClosed:
+                del game.clients[ws]
+
+    async def broadcast_player_left(self, player_name: str, target=None):
+        action = "player_left"
+        target = player_name
         for ws, name in self.clients.items():
-            await send_json(ws, name, action, target)
+            try:
+                await send_json(ws, name, action, target)
+            except websockets.exceptions.ConnectionClosed:
+                del game.clients[ws]
 
     async def broadcast_lobby_status(self):
         """Broadcast current lobby status to all players"""
@@ -199,16 +211,19 @@ class MafiaGame:
         total_count = len(self.players)
         
         for ws, name in self.clients.items():
-            await send_json(ws, name, "lobby_status", {
-                "ready_count": ready_count,
-                "total_count": total_count,
-                "min_players": 3,
-                "max_players": self.max_players,
-                "players": {
-                    pname: pdata["ready"] 
-                    for pname, pdata in self.players.items()
-                }
-            })
+            try:
+                await send_json(ws, name, "lobby_status", {
+                    "ready_count": ready_count,
+                    "total_count": total_count,
+                    "min_players": 3,
+                    "max_players": self.max_players,
+                    "players": {
+                        pname: pdata["ready"] 
+                        for pname, pdata in self.players.items()
+                    }
+                })
+            except websockets.exceptions.ConnectionClosed:
+                del game.clients[ws]
     
     async def broadcast_restart_status(self):
         """Broadcast restart status to all players"""
@@ -216,18 +231,38 @@ class MafiaGame:
         total_count = len(self.players)
         
         for ws, name in self.clients.items():
-            await send_json(ws, name, "restart_status", {
-                "restart_count": restart_count,
-                "total_count": total_count,
-                "players": {
-                    pname: pdata["restart"] 
-                    for pname, pdata in self.players.items()
-                }
-            })
+            try:
+                await send_json(ws, name, "restart_status", {
+                    "restart_count": restart_count,
+                    "total_count": total_count,
+                    "players": {
+                        pname: pdata["restart"] 
+                        for pname, pdata in self.players.items()
+                    }
+                })
+            except websockets.exceptions.ConnectionClosed:
+                del game.clients[ws]
+
+        for name, ws in self.rpis.items():
+            try:
+                await send_json(ws, name, "restart_status", {
+                    "restart_count": restart_count,
+                    "total_count": total_count,
+                    "players": {
+                        pname: pdata["restart"] 
+                        for pname, pdata in self.players.items()
+                    }
+                })
+            except websockets.exceptions.ConnectionClosed:
+                del game.clients[ws]
 
     async def broadcast_vote(self):
         for name in self.rpis:
-            await self.request_action(name, "vote")
+            try:
+                await self.request_action(name, "vote")
+            finally:
+                print("[DEBUG] unable to broadcast vote")
+
 
     async def assign_player(self):
         if self.mafia_count == 2:
@@ -397,8 +432,12 @@ class MafiaGame:
                 await self.broadcast("vote_result_tie", voted_out)
                 await self.broadcast_vote()
                 return
-            
+
             print(f"[DEBUG] Player voted out: {voted_out[0]}")
+            if self.mafia_count == 2 and voted_out in [self.mafia_name_one, self.mafia_name_two]:
+                self.mafia_count -= 1
+                if voted_out == self.mafia_name_one:
+                    self.mafia_name_one = self.mafia_name_one
             self.players[voted_out[0]]["alive"] = False
             await self.broadcast("vote_result", voted_out)
             
@@ -571,31 +610,71 @@ async def handler(ws: WebSocketServerProtocol):
                 await game.update()
 
     except websockets.exceptions.ConnectionClosedError:
-        print(f"[DEBUG] Connection closed unexpectedly for player: {player_name}")
+        print(f"[DEBUG] Connection closed unexpectedly for player: {player_name}, going back to day phase")
     except Exception as e:
         print(f"[ERROR] Handler error for {player_name}: {e}")
         import traceback
         traceback.print_exc()
     finally:
         if player_name:
-            print(f"[DEBUG] Cleaning up player {player_name}")
+            print(f"[DEBUG] Cleaning up player {player_name} and restarting game")
             async with lock:
-                if ws in game.clients:
-                    del game.clients[ws]
-                if player_name in game.players:
-                    player_id = game.name_to_player_id.get(player_name)
-                    if player_id is not None:
-                        del game.player_id_to_name[player_id]
-                        del game.name_to_player_id[player_name]
-                    del game.players[player_name]
-                
-                # Broadcast updated lobby status if still in lobby
-                if game.state == "LOBBY":
-                    await game.broadcast_lobby_status()
-                elif game.state == "GAMEOVER":
-                    await game.broadcast_restart_status()
-                    
+                await clean_player(player_name, game, ws)
             print(f"[DEBUG] Player {player_name} removed from game")
+
+async def clean_player(player_name: str, game: MafiaGame, ws: WebSocketServerProtocol):
+        print("[DEBUG] attempting to gracefully resolve game logic")
+        # if mafia left, kill him and check that if civilians won game, if they didn't, then continue
+        if player_name:
+            print(f"[DEBUG]: player_name: {player_name}")
+            game.players[player_name]["alive"] = False
+            await game.broadcast("disconnect", player_name)
+            await send_json(game.rpis[player_name], player_name, "disconnect", None)
+
+        # print(f"[DEBUG] player name being kicked out: {player_name}, mafia name_one: {game.mafia_name_one}, 2: {game.mafia_name_two}")
+        # if player_name in [game.mafia_name_one, game.mafia_name_two]:
+        #     if game.mafia_count == 2:
+        #         game.mafia_count -= 1
+        #         if player_name == game.mafia_name_one:
+        #             game.mafia_name_one = game.mafia_name_two
+        #
+        # elif player_name in [game.doctor_name_one, game.doctor_name_two]:
+        #     if game.doctor_count == 2:
+        #         game.doctor_count -= 1
+        #         if player_name == game.doctor_name_one:
+        #             game.doctor_name_one = game.doctor_name_two
+
+
+        # check if winner before deletions
+        # winner = game.check_game_over()
+
+        if ws in game.clients:
+            del game.clients[ws]
+        if player_name in game.players:
+            player_id = game.name_to_player_id.get(player_name)
+            if player_id is not None:
+                del game.player_id_to_name[player_id]
+                del game.name_to_player_id[player_name]
+            del game.players[player_name]
+
+        if game.state == "LOBBY":
+            await game.broadcast_lobby_status()
+            return
+
+        print("[DEBUG] Game now over because player left, restarting")
+        game.state = "GAMEOVER"
+        await game.broadcast("game_over", {
+            "winner": "no_one",
+            "mafia": [game.mafia_name_one, game.mafia_name_two] if game.mafia_count == 2 else [game.mafia_name_one]
+        })
+        await game.broadcast_restart_status()
+
+        
+        # Broadcast updated lobby status if still in lobby
+                
+        print(f"[DEBUG] Player {player_name} removed from game")
+        
+
 
 async def main():
     async with websockets.serve(handler, HOST, PORT):

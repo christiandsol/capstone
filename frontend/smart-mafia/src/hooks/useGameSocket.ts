@@ -33,9 +33,12 @@ interface UseGameSocketReturn {
     sendRestart: () => void;
 }
 
+type NotifyFunction = (message: string, duration?: number) => string;
+
 export const useGameSocket = (
     onStatusChange: (status: string) => void,
-    playerName: string
+    playerName: string,
+    notify?: NotifyFunction,
 ): UseGameSocketReturn => {
     const gameSocketRef = useRef<WebSocket | null>(null);
     const currentHeadRef = useRef<string>('headDown');
@@ -49,10 +52,8 @@ export const useGameSocket = (
 
     const setCurrentHead = (position: string) => {
         currentHeadRef.current = position;
-        // optional: immediately send
         sendHeadPosition(position);
     };
-
 
     useEffect(() => {
         let isCurrentConnection = true;
@@ -100,7 +101,6 @@ export const useGameSocket = (
 
                     if (data.action === 'lobby_status') {
                         setLobbyStatus(data.target);
-                        // When we receive lobby_status and we're in game-over state, it means the game has restarted
                         if (gameOverData) {
                             setGameOverData(null);
                             setRestartStatus(null);
@@ -119,18 +119,25 @@ export const useGameSocket = (
                             `Restart: ${restart_count}/${total_count} want to play again`
                         );
 
-                        // Check if everyone has agreed to restart
                         if (restart_count === total_count && total_count > 0) {
                             console.log('[Game] All players agreed to restart!');
-                            // Clear game over state to trigger transition back to lobby
                             setGameOverData(null);
                             setRole(null);
                         }
                     }
 
+                    if (data.action === 'disconnect') {
+                        const disconnectedPlayer = data.target;
+                        console.log(`[Game] Player disconnected: ${disconnectedPlayer}`);
+                        // Show notification if notify function is provided
+                        if (notify) {
+                            notify(`${disconnectedPlayer} disconnected`, 5000);
+                        }
+                    }
+
                     if (['mafia', 'doctor', 'civilian'].includes(data.action)) {
                         setRole(data.action);
-                        setGameOverData(null); // Reset game over data when new game starts
+                        setGameOverData(null);
                         setRestartStatus(null);
                         console.log(`[Game] Role: ${data.action}`);
                         onStatusChange(`You are ${data.player} - Role: ${data.action.toUpperCase()}`);
@@ -138,8 +145,16 @@ export const useGameSocket = (
 
                     if (data.action === 'game_over') {
                         setGameOverData(data.target);
-                        const winner = data.target.winner === 'mafia' ? 'MAFIA' : 'CIVILIANS';
-                        onStatusChange(`GAME OVER! ${winner} WIN!`);
+                        const game_winner = data.target.winner
+                        let phrase: string = "";
+                        if (game_winner === "mafia") {
+                            phrase = 'THE MAFIA';
+                        } else if (game_winner == "no_one") {
+                            phrase = "NO ONE"
+                        } else {
+                            phrase = "THE CIVILIANS"
+                        }
+                        onStatusChange(`GAME OVER! ${phrase} WON!`);
                     }
 
                     if (data.action === 'night_result') {
