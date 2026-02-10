@@ -465,9 +465,9 @@ class MafiaGame:
             await self.broadcast_lobby_status()
         
         # If state changed, recursively call update to continue processing
-        if self.state != state_before:
-            print(f"[DEBUG] State changed from {state_before} to {self.state}, continuing update...")
-            await self.update()
+        # if self.state != state_before:
+        #     print(f"[DEBUG] State changed from {state_before} to {self.state}, continuing update...")
+        #     await self.update()
 
 
 # ------------------ SERVER ------------------
