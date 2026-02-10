@@ -515,7 +515,51 @@ async def handler(ws: WebSocketServerProtocol):
                 if player_name == "rpi":
                     player_name = msg.get("name")
                     print(f"[DEBUG] server adding rpi: {player_name}")
-                    game.rpis[player_name] = ws
+                    
+                    async with lock:
+                        # Check if player already exists (from frontend registration)
+                        if player_name in game.players:
+                            # Player already exists - link RPI to existing player
+                            print(f"[DEBUG] Linking RPI to existing player: {player_name}")
+                            game.rpis[player_name] = ws
+                            player_id = game.name_to_player_id.get(player_name)
+                            if player_id:
+                                # Send confirmation with existing player ID
+                                await send_json(ws, player_id, "id_registered", None)
+                                print(f"[DEBUG] RPI linked to existing player {player_name} (ID: {player_id})")
+                            else:
+                                print(f"[DEBUG] Warning: Player {player_name} exists but has no ID")
+                        else:
+                            # New player registration via RPI
+                            if len(game.players) >= game.max_players:
+                                print(f"[DEBUG] Game is full ({game.max_players} players)")
+                                await ws.close(1008, "Game is full")
+                                return
+
+                            player_id = len(game.players) + 1
+                            game.player_id_to_name[player_id] = player_name
+                            game.name_to_player_id[player_name] = player_id
+
+                            # Register RPI player
+                            game.rpis[player_name] = ws
+                            game.players[player_name] = {
+                                "setup": True,
+                                "ready": False,
+                                "restart": False,
+                                "voiceCommand": False,
+                                "head": "up",
+                                "vote": None,
+                                "kill": None,
+                                "save": None,
+                                "alive": True
+                            }
+                            
+                            # Send confirmation
+                            await send_json(ws, player_id, "id_registered", None)
+                            print(f"[DEBUG] RPI Player {player_name} registered successfully with ID {player_id}")
+                    
+                    # Broadcast lobby status to all players
+                    await game.broadcast_lobby_status()
                     continue
                 print(f"[DEBUG] server adding player: {player_name}")
                 
