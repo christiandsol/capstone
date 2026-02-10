@@ -62,8 +62,8 @@ export const useGameSocket = (
         const connect = () => {
             if (!isCurrentConnection) return;
 
-            //const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-            const protocol = 'ws';
+            const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+            // const protocol = 'ws';
             const host = API_CONFIG.GAME_SERVER_HOST;
             const port = API_CONFIG.GAME_SERVER_PORT;
 
@@ -103,6 +103,7 @@ export const useGameSocket = (
                     }
 
                     if (data.action === 'lobby_status') {
+                        console.log("HERE")
                         setLobbyStatus(data.target);
                         if (gameOverData) {
                             setGameOverData(null);

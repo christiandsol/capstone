@@ -668,7 +668,6 @@ async def clean_player(player_name: str, ws: WebSocketServerProtocol):
         if player_name:
             print(f"[DEBUG]: player_name: {player_name}")
             game.players[player_name]["alive"] = False
-            await game.broadcast_restart_status()
             if player_name in game.rpis:
                 ws_rpi = game.rpis[player_name]
                 await send_json(ws_rpi, player_name, "disconnect", None)
