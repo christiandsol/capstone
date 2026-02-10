@@ -89,7 +89,7 @@ async def handle_vote(ws, imu, recognizer, name):
             continue
         
         # Set action and target based on gesture recognition
-        action = "targeted"
+        action = "target"
         target = digit
         
         print(f"[Pi] Sending vote for player {digit}...")
