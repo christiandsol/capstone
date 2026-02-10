@@ -137,20 +137,52 @@ async def rpi_handler(name):
     # uri = f"wss://{SERVER_IP}/ws"
 
     print(f"[DEBUG] Connecting to {uri}")
+    print(f"[DEBUG] Make sure the server is running on {SERVER_IP}:{SERVER_PORT}")
 
-    async with websockets.connect(uri) as ws:
-        print('[DEBUG] Connected to server')
-        setup_msg = {
-            "action": "setup",
-            "name": name,
-            "target": "rpi"
-        }
-        await ws.send(json.dumps(setup_msg))
-        print(f"[DEBUG] Sent setup message with name: {name}")
-        
-        imu = BerryIMUInterface(debug=False)
-        recognizer = GestureRecognizer()
-        await rpi_helper(ws, name, imu, recognizer)
+    try:
+        # Add timeout and ping settings for better connection handling
+        async with websockets.connect(
+            uri,
+            ping_interval=30,
+            ping_timeout=10,
+            close_timeout=10
+        ) as ws:
+            print('[DEBUG] Connected to server')
+            setup_msg = {
+                "action": "setup",
+                "name": name,
+                "target": "rpi"
+            }
+            await ws.send(json.dumps(setup_msg))
+            print(f"[DEBUG] Sent setup message with name: {name}")
+            
+            imu = BerryIMUInterface(debug=False)
+            recognizer = GestureRecognizer()
+            await rpi_helper(ws, name, imu, recognizer)
+    except websockets.exceptions.InvalidURI:
+        print(f"[ERROR] Invalid URI: {uri}")
+        print("[ERROR] Check that SERVER_IP and SERVER_PORT are correct")
+    except websockets.exceptions.InvalidState:
+        print("[ERROR] Connection is in an invalid state")
+    except OSError as e:
+        print(f"[ERROR] Network error: {e}")
+        print(f"[ERROR] Could not connect to {SERVER_IP}:{SERVER_PORT}")
+        print("[ERROR] Possible issues:")
+        print("  1. Server is not running")
+        print("  2. Wrong IP address")
+        print("  3. Firewall blocking port 5050")
+        print("  4. Network connectivity issue")
+    except asyncio.TimeoutError:
+        print(f"[ERROR] Connection timeout to {SERVER_IP}:{SERVER_PORT}")
+        print("[ERROR] The server did not respond in time")
+        print("[ERROR] Check:")
+        print("  1. Is the server running? (python3 server.py)")
+        print("  2. Is the IP address correct?")
+        print("  3. Are both devices on the same network?")
+    except Exception as e:
+        print(f"[ERROR] Unexpected error: {e}")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     # Get player name from command line argument
