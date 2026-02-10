@@ -9,8 +9,19 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'berryIMU'))
 from gesturetwo import BerryIMUInterface, GestureRecognizer
 
-SERVER_IP = "127.0.0.1"
-SERVER_PORT = 5050
+# ===== CONNECTION CONFIGURATION =====
+# Option 1: Local connection (same device or same network)
+# Uncomment these for local connection:
+# SERVER_IP = "127.0.0.1"  # or "192.168.x.x" for same network
+# SERVER_PORT = 5050
+# USE_NGROK = False
+
+# Option 2: ngrok tunnel (for different subnets/networks)
+# Uncomment and set these for ngrok:
+USE_NGROK = True
+SERVER_IP = "YOUR_NGROK_URL_HERE.ngrok.io"  # Replace with your ngrok URL (without https://)
+SERVER_PORT = 5050  # Not used for ngrok, but kept for compatibility
+# ====================================
 
 def parse_json(message: Data):
     try:
@@ -133,11 +144,19 @@ async def rpi_helper(ws, name, imu, recognizer):
         print("[DEBUG] Player leaving...")
 
 async def rpi_handler(name):
-    uri = f"ws://{SERVER_IP}:{SERVER_PORT}"
-    # uri = f"wss://{SERVER_IP}/ws"
+    # Build URI based on connection type
+    if USE_NGROK:
+        # ngrok uses wss:// (secure WebSocket) and no port
+        uri = f"wss://{SERVER_IP}"
+    else:
+        # Local connection uses ws:// with port
+        uri = f"ws://{SERVER_IP}:{SERVER_PORT}"
 
     print(f"[DEBUG] Connecting to {uri}")
-    print(f"[DEBUG] Make sure the server is running on {SERVER_IP}:{SERVER_PORT}")
+    if USE_NGROK:
+        print(f"[DEBUG] Using ngrok tunnel: {SERVER_IP}")
+    else:
+        print(f"[DEBUG] Make sure the server is running on {SERVER_IP}:{SERVER_PORT}")
 
     try:
         # Add timeout and ping settings for better connection handling
