@@ -61,11 +61,12 @@ export const useGameSocket = (
         const connect = () => {
             if (!isCurrentConnection) return;
 
-            const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+            //const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+	    const protocol = 'ws';
             const host = API_CONFIG.GAME_SERVER_HOST;
             const port = API_CONFIG.GAME_SERVER_PORT;
 
-            const wsUrl = `${protocol}://${host}${protocol === 'ws' ? `:${port}` : ''}/ws`;
+            const wsUrl = `${protocol}://${host}:${port}`;
 
             console.log('[Game] Connecting to:', wsUrl);
 

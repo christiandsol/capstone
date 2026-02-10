@@ -191,19 +191,13 @@ class MafiaGame:
 
     async def broadcast(self, action, target=None):
         for ws, name in list(self.clients.items()):
-            try:
-                await send_json(ws, name, action, target)
-            except websockets.exceptions.ConnectionClosed:
-                del game.clients[ws]
+            await send_json(ws, name, action, target)
 
-    async def broadcast_player_left(self, player_name: str, target=None):
-        action = "player_left"
-        target = player_name
-        for ws, name in self.clients.items():
-            try:
-                await send_json(ws, name, action, target)
-            except websockets.exceptions.ConnectionClosed:
-                del game.clients[ws]
+#    async def broadcast_player_left(self, player_name: str, target=None):
+#        action = "player_left"
+#        target = player_name
+#        for ws, name in self.clients.items():
+#            await send_json(ws, name, action, target)
 
     async def broadcast_lobby_status(self):
         """Broadcast current lobby status to all players"""
@@ -211,19 +205,16 @@ class MafiaGame:
         total_count = len(self.players)
         
         for ws, name in self.clients.items():
-            try:
-                await send_json(ws, name, "lobby_status", {
-                    "ready_count": ready_count,
-                    "total_count": total_count,
-                    "min_players": 3,
-                    "max_players": self.max_players,
-                    "players": {
-                        pname: pdata["ready"] 
-                        for pname, pdata in self.players.items()
-                    }
-                })
-            except websockets.exceptions.ConnectionClosed:
-                del game.clients[ws]
+            await send_json(ws, name, "lobby_status", {
+                "ready_count": ready_count,
+                "total_count": total_count,
+                "min_players": 3,
+                "max_players": self.max_players,
+                "players": {
+                    pname: pdata["ready"] 
+                    for pname, pdata in self.players.items()
+                }
+            })
     
     async def broadcast_restart_status(self):
         """Broadcast restart status to all players"""
@@ -231,37 +222,31 @@ class MafiaGame:
         total_count = len(self.players)
         
         for ws, name in self.clients.items():
-            try:
-                await send_json(ws, name, "restart_status", {
-                    "restart_count": restart_count,
-                    "total_count": total_count,
-                    "players": {
-                        pname: pdata["restart"] 
-                        for pname, pdata in self.players.items()
-                    }
-                })
-            except websockets.exceptions.ConnectionClosed:
-                del game.clients[ws]
+            await send_json(ws, name, "restart_status", {
+                "restart_count": restart_count,
+                "total_count": total_count,
+                "players": {
+                    pname: pdata["restart"] 
+                    for pname, pdata in self.players.items()
+                }
+            })
 
         for name, ws in self.rpis.items():
-            try:
-                await send_json(ws, name, "restart_status", {
-                    "restart_count": restart_count,
-                    "total_count": total_count,
-                    "players": {
-                        pname: pdata["restart"] 
-                        for pname, pdata in self.players.items()
-                    }
-                })
-            except websockets.exceptions.ConnectionClosed:
-                del game.clients[ws]
+            await send_json(ws, name, "restart_status", {
+                "restart_count": restart_count,
+                "total_count": total_count,
+                "players": {
+                    pname: pdata["restart"] 
+                    for pname, pdata in self.players.items()
+                }
+            })
 
     async def broadcast_vote(self):
         for name in self.rpis:
-            try:
-                await self.request_action(name, "vote")
-            finally:
-                print("[DEBUG] unable to broadcast vote")
+#            try:
+            await self.request_action(name, "vote")
+#            finally:
+#                print("[DEBUG] unable to broadcast vote")
 
 
     async def assign_player(self):
@@ -464,12 +449,6 @@ class MafiaGame:
             self.reset_game_state()
             await self.broadcast_lobby_status()
         
-        # If state changed, recursively call update to continue processing
-        # if self.state != state_before:
-        #     print(f"[DEBUG] State changed from {state_before} to {self.state}, continuing update...")
-        #     await self.update()
-
-
 # ------------------ SERVER ------------------
 
 game = MafiaGame()
@@ -628,9 +607,11 @@ async def clean_player(player_name: str, game: MafiaGame, ws: WebSocketServerPro
         if player_name:
             print(f"[DEBUG]: player_name: {player_name}")
             game.players[player_name]["alive"] = False
-            await game.broadcast("disconnect", player_name)
-            await send_json(game.rpis[player_name], player_name, "disconnect", None)
-
+            await game.broadcast("restart_status", None)
+            if player_name in game.rpis:
+                ws_rpi = game.rpis[player_name]
+                await send_json(ws_rpi, player_name, "disconnect", None)
+                del game.rpis[player_name]
         # print(f"[DEBUG] player name being kicked out: {player_name}, mafia name_one: {game.mafia_name_one}, 2: {game.mafia_name_two}")
         # if player_name in [game.mafia_name_one, game.mafia_name_two]:
         #     if game.mafia_count == 2:
@@ -677,7 +658,7 @@ async def clean_player(player_name: str, game: MafiaGame, ws: WebSocketServerPro
 
 
 async def main():
-    async with websockets.serve(handler, HOST, PORT):
+    async with websockets.serve(handler, HOST, PORT, ping_interval=None, ping_timeout=None, close_timeout=10):
         print(f"WebSocket server running on {PORT}")
         await asyncio.Future()
 
