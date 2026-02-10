@@ -49,6 +49,7 @@ export const useGameSocket = (
     const [gameOverData, setGameOverData] = useState<GameOverData | null>(null);
     const hasSetupRef = useRef(false);
     const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const lastStatusRef = useRef<string>('');
 
     const setCurrentHead = (position: string) => {
         currentHeadRef.current = position;
@@ -62,7 +63,7 @@ export const useGameSocket = (
             if (!isCurrentConnection) return;
 
             //const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-	    const protocol = 'ws';
+            const protocol = 'ws';
             const host = API_CONFIG.GAME_SERVER_HOST;
             const port = API_CONFIG.GAME_SERVER_PORT;
 
@@ -97,7 +98,8 @@ export const useGameSocket = (
                     if (data.action === 'id_registered') {
                         console.log(`[Game] Player registered: ${data.player}`);
                         setPlayerId(data.player);
-                        onStatusChange(`Registered as Player ${data.player}. Waiting in lobby...`);
+                        lastStatusRef.current = `Registered as Player ${data.player}. Waiting in lobby...`;
+                        onStatusChange(lastStatusRef.current);
                     }
 
                     if (data.action === 'lobby_status') {
@@ -108,17 +110,20 @@ export const useGameSocket = (
                             setRole(null);
                         }
                         const { ready_count, total_count, min_players } = data.target;
-                        onStatusChange(
-                            `Lobby: ${ready_count}/${total_count} ready (min: ${min_players})`
-                        );
+                        // Only update status if we're still in lobby waiting for players
+                        if (ready_count < total_count) {
+                            const newStatus = `Lobby: ${ready_count}/${total_count} ready (min: ${min_players})`;
+                            lastStatusRef.current = newStatus;
+                            onStatusChange(newStatus);
+                        }
                     }
 
                     if (data.action === 'restart_status') {
                         setRestartStatus(data.target);
                         const { restart_count, total_count } = data.target;
-                        onStatusChange(
-                            `Restart: ${restart_count}/${total_count} want to play again`
-                        );
+                        const newStatus = `Restart: ${restart_count}/${total_count} want to play again`;
+                        lastStatusRef.current = newStatus;
+                        onStatusChange(newStatus);
 
                         if (restart_count === total_count && total_count > 0) {
                             console.log('[Game] All players agreed to restart!');
@@ -141,7 +146,16 @@ export const useGameSocket = (
                         setGameOverData(null);
                         setRestartStatus(null);
                         console.log(`[Game] Role: ${data.action}`);
-                        onStatusChange(`You are ${data.player} - Role: ${data.action.toUpperCase()}`);
+                        const newStatus = `You are ${data.player} - Role: ${data.action.toUpperCase()}`;
+                        lastStatusRef.current = newStatus;
+                        onStatusChange(newStatus);
+                    }
+
+                    if (data.action === 'heads_down') {
+                        console.log("[DEBUG] Moving on to night phase, everyone put head down please")
+                        const newStatus = "Moving on to night phase, everyone put head down please";
+                        lastStatusRef.current = newStatus;
+                        onStatusChange(newStatus);
                     }
 
                     if (data.action === 'game_over') {
@@ -155,15 +169,69 @@ export const useGameSocket = (
                         } else {
                             phrase = "THE CIVILIANS"
                         }
-                        onStatusChange(`GAME OVER! ${phrase} WON!`);
+                        const newStatus = `GAME OVER! ${phrase} WON!`;
+                        lastStatusRef.current = newStatus;
+                        onStatusChange(newStatus);
                     }
 
                     if (data.action === 'night_result') {
                         console.log('[Game] Night result:', data.target);
+                        const killed = data.target.killed
+                        const saved = data.target.saved
+                        let newStatus = "";
+                        if (killed != saved) {
+                            newStatus = `Mafia killed ${killed} in the night, and no one was there to save them, everyone discuss and say "ready to vote" when you are`
+                        } else {
+                            newStatus = `Mafia killed ${killed} in the night, and they were SAVED, everyone discuss and say "ready to vote" when you are`
+                        }
+                        lastStatusRef.current = newStatus;
+                        onStatusChange(newStatus);
                     }
 
                     if (data.action === 'vote_result') {
+                        const vote_result = data.target
+                        const newStatus = `${vote_result} was voted out`;
+                        lastStatusRef.current = newStatus;
+                        onStatusChange(newStatus);
                         console.log('[Game] Vote result:', data.target);
+                    }
+
+                    if (data.action === 'vote_result_tie') {
+                        const vote_result = data.target
+                        const newStatus = `Vote result was a tie between ${vote_result}, vote again`;
+                        lastStatusRef.current = newStatus;
+                        onStatusChange(newStatus);
+                        console.log('[Game] Vote result was a tie, vote again:', data.target);
+                    }
+
+                    if (data.action === 'day_phase') {
+                        console.log('[Game] Day phase started - voting is active');
+                        const newStatus = 'Day Phase: Time to vote!';
+                        lastStatusRef.current = newStatus;
+                        onStatusChange(newStatus);
+                    }
+
+                    if (data.action === 'mafia_kill') {
+                        const target = data.target;
+                        console.log(`[Game] Mafia killed ${target}`);
+                        const newStatus = `Doctor, your turn to vote, everyone heads down`;
+                        lastStatusRef.current = newStatus;
+                        onStatusChange(newStatus);
+                    }
+
+                    if (data.action === 'doctor_save') {
+                        const target = data.target;
+                        console.log(`[Game] Doctor saved ${target}`);
+                        const newStatus = `Discussing night results...`;
+                        lastStatusRef.current = newStatus;
+                        onStatusChange(newStatus);
+                    }
+
+                    if (data.action === 'night_phase_kill') {
+                        console.log('[Game] Night phase started');
+                        const newStatus = 'Night Phase: Mafia is acting... Everyone else heads down';
+                        lastStatusRef.current = newStatus;
+                        onStatusChange(newStatus);
                     }
 
                     if (data.action == 'heads_down') {
@@ -173,13 +241,17 @@ export const useGameSocket = (
 
                 gameSocketRef.current.onerror = (error: Event) => {
                     console.error('[Game] WebSocket error:', error);
-                    onStatusChange('Error: Failed to connect to game server');
+                    const newStatus = 'Error: Failed to connect to game server';
+                    lastStatusRef.current = newStatus;
+                    onStatusChange(newStatus);
                 };
 
                 gameSocketRef.current.onclose = () => {
                     console.log('[Game] Disconnected from game server');
                     gameSocketRef.current = null;
-                    onStatusChange('Disconnected from game server');
+                    const newStatus = 'Disconnected from game server';
+                    lastStatusRef.current = newStatus;
+                    onStatusChange(newStatus);
 
                     if (isCurrentConnection) {
                         reconnectTimeoutRef.current = setTimeout(() => {
@@ -191,7 +263,9 @@ export const useGameSocket = (
             } catch (error) {
                 console.error('[Game] Failed to connect:', error);
                 const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                onStatusChange(`Error connecting to game server: ${errorMessage}`);
+                const newStatus = `Error connecting to game server: ${errorMessage}`;
+                lastStatusRef.current = newStatus;
+                onStatusChange(newStatus);
             }
         };
 
@@ -225,7 +299,7 @@ export const useGameSocket = (
     const sendVoiceCommand = (command: number) => {
         if (gameSocketRef.current?.readyState === WebSocket.OPEN) {
             gameSocketRef.current.send(JSON.stringify({
-                action: 'voiceCommand',
+                action: 'control',
                 target: command
             }));
             console.log('[Game] Sent voice command:', command);

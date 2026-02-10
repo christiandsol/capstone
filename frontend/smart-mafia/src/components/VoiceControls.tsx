@@ -46,7 +46,7 @@ export const VoiceControls: React.FC<VoiceControlsProps> = ({
               cursor: 'pointer',
               fontWeight: 'bold',
               boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
-              flex:1
+              flex: 1
             }}
           >
             {isMuted ? '🔇 Unmute' : '🔊 Mute'}
@@ -54,7 +54,7 @@ export const VoiceControls: React.FC<VoiceControlsProps> = ({
         )}
       </div>
       <div style={{ marginTop: '10px', color: '#888', fontSize: '14px' }}>
-        Say: "assign players", "ready to start", "ready to vote", or "night time"
+        <strong>Voice Commands:</strong> Try saying: "assign players", "ready to vote", "night time"
       </div>
     </div>
   );

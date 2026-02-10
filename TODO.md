@@ -1,6 +1,6 @@
 
 # TODO
-- [ ] Add type checking (check if you've already deleted player)
+- [ ] Add "Assign players" functionality
 
 # Global TODO: 
 

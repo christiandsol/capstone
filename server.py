@@ -9,6 +9,10 @@ HOST = "0.0.0.0"
 PORT = 5050
 MAX_PLAYERS = 8
 
+# Voice command codes
+VOICE_COMMAND_READY_ASSIGN = 2  # "assign players" during LOBBY
+VOICE_COMMAND_READY_VOTE = 3    # "ready to vote" during READYTOVOTE phase
+
 class MafiaGame:
     def __init__(self):
         self.state = "LOBBY"
@@ -42,6 +46,13 @@ class MafiaGame:
             return False
         return all(p["ready"] for p in self.players.values())
     
+    def check_everyone_ready_to_vote(self):
+        """Check if all alive players are ready to vote"""
+        alive_players = [p for p in self.players.values() if p["alive"]]
+        if not alive_players:
+            return False
+        return all(p["ready_to_vote"] for p in alive_players)
+
     def check_everyone_wants_restart(self):
         """Check if all players want to restart"""
         if len(self.players) == 0:
@@ -85,6 +96,7 @@ class MafiaGame:
         # Reset all player states
         for player_data in self.players.values():
             player_data["ready"] = False
+            player_data["ready_to_vote"] = False
             player_data["restart"] = False
             player_data["head"] = "up"
             player_data["vote"] = None
@@ -118,7 +130,7 @@ class MafiaGame:
         return True
 
     async def request_action(self, name: str, action: str):
-        print(f"[DEBUG] NAME: {name}")
+        print(f"[DEBUG] Requesting action '{action}' from {name}")
         if name == None:
             return
         ws = self.rpis.get(name)
@@ -190,14 +202,9 @@ class MafiaGame:
         return winners
 
     async def broadcast(self, action, target=None):
+        """Broadcast to web clients"""
         for ws, name in list(self.clients.items()):
             await send_json(ws, name, action, target)
-
-#    async def broadcast_player_left(self, player_name: str, target=None):
-#        action = "player_left"
-#        target = player_name
-#        for ws, name in self.clients.items():
-#            await send_json(ws, name, action, target)
 
     async def broadcast_lobby_status(self):
         """Broadcast current lobby status to all players"""
@@ -242,14 +249,13 @@ class MafiaGame:
             })
 
     async def broadcast_vote(self):
+        """Request vote from each alive player"""
         for name in self.rpis:
-#            try:
-            await self.request_action(name, "vote")
-#            finally:
-#                print("[DEBUG] unable to broadcast vote")
-
+            if name in self.players and self.players[name]["alive"]:
+                await self.request_action(name, "vote")
 
     async def assign_player(self):
+        """Assign and broadcast roles to all players"""
         if self.mafia_count == 2:
             for ws, name in self.clients.items():
                 role = "civilian"
@@ -281,10 +287,10 @@ class MafiaGame:
                     role = "doctor"
                 await send_json(ws, name, role, None)
 
-
     async def update(self):
-        state_before = self.state
+        """Main game loop - handles state transitions"""
         
+        # LOBBY STATE: Wait for all players to be ready
         if self.state == "LOBBY" and self.check_everyone_ready():
             print(f"[DEBUG] All {len(self.players)} players ready! Starting game...")
             # Assign roles randomly based on player count
@@ -304,6 +310,7 @@ class MafiaGame:
             self.state = "ASSIGN"
             self.expected_signals = set()
 
+        # ASSIGN STATE: Send role assignments to all players
         if self.state == "ASSIGN":
             await self.assign_player()
             await self.broadcast("heads_down", None)
@@ -311,10 +318,13 @@ class MafiaGame:
             self.expected_signals = {"headUp", "headDown"}
             print("[DEBUG] Moving on to night phase, everyone put head down please")
 
+        # HEADSDOWN STATE: Wait for all alive players to put heads down
         if self.state == "HEADSDOWN" and self.check_heads_down([]):
             self.state = "MAFIAVOTE"
+            await self.broadcast("night_phase_kill", None)
             self.expected_signals = {"headUp", "headDown", "voiceCommand", "target"}
             print("[DEBUG] MOVING ON TO MAFIA VOTE STAGE")
+            # Request mafia to make kill decision
             if self.mafia_count == 1:
                 await self.request_action(self.mafia_name_one, "kill")
             elif self.mafia_count == 2:
@@ -323,19 +333,21 @@ class MafiaGame:
                     self.request_action(self.mafia_name_two, "kill")
                 )
                 
+        # MAFIAVOTE STATE: Wait for mafia to decide who to kill
         if self.state == "MAFIAVOTE":
-            # Check if mafia have made their kill choice (don't check heads)
+            # Check if mafia have made their kill choice
             kill = self.mafia_kill()
             if kill:
                 print(f'[DEBUG] Mafia killed: {kill}')
                 self.last_killed = kill
-                if not (self.players[self.doctor_name_one]["alive"] or self.players[self.doctor_name_two]["alive"]):
+                # Only apply kill if no doctor or doctor is dead
+                if not (self.doctor_count >= 1 and self.players[self.doctor_name_one]["alive"]) and not (self.doctor_count == 2 and self.players[self.doctor_name_two]["alive"]):
                     self.players[kill]["alive"] = False
-                
+                await self.broadcast("mafia_kill", kill)
                 # Check if game is over after kill
                 winner = self.check_game_over()
                 if winner:
-                    print("[DEBUG] GAME OVER")
+                    print("[DEBUG] GAME OVER after mafia kill")
                     self.game_winner = winner
                     self.state = "GAMEOVER"
                     self.expected_signals = set()
@@ -351,6 +363,7 @@ class MafiaGame:
                 self.expected_signals = {"headUp", "headDown", "voiceCommand", "target"}
                 print('[DEBUG] MOVING ON TO DOCTOR VOTE STAGE')
                 
+                # Request doctor to make save decision
                 if self.doctor_count == 1:
                     await self.request_action(self.doctor_name_one, "save")
                 elif self.doctor_count == 2:
@@ -359,21 +372,25 @@ class MafiaGame:
                         self.request_action(self.doctor_name_two, "save")
                     )
 
+        # DOCTORVOTE STATE: Wait for doctor to decide who to save
         if self.state == "DOCTORVOTE":
-            # Check if doctors have made their save choice (don't check heads)
+            # Check if doctors have made their save choice
             save = self.doctor_save()
             if save:
                 print(f'[DEBUG] Doctor saved: {save}')
-                print(f'[DEBUG] Last attempted mafia kill: : {self.last_killed}')
+                print(f'[DEBUG] Last attempted mafia kill: {self.last_killed}')
+                # Apply the kill if not saved
                 if self.last_killed != save:
                     self.players[self.last_killed]["alive"] = False
                 self.last_saved = save
                 self.players[save]["alive"] = True
                 self.state = "NARRATE"
 
+                await self.broadcast("doctor_save", save);
+                # Check if game is over after doctor save
                 winner = self.check_game_over()
                 if winner:
-                    print("[DEBUG] GAME OVER")
+                    print("[DEBUG] GAME OVER after doctor save")
                     self.game_winner = winner
                     self.state = "GAMEOVER"
                     self.expected_signals = set()
@@ -384,6 +401,7 @@ class MafiaGame:
                     await self.broadcast_restart_status()
                     return
 
+        # NARRATE STATE: Announce night results and move to ready to vote
         if self.state == "NARRATE":
             print("[DEBUG] Narrating night results...")
             await self.broadcast("night_result", {
@@ -394,7 +412,7 @@ class MafiaGame:
             # Check if game is over after night
             winner = self.check_game_over()
             if winner:
-                print("[DEBUG] GAME OVER")
+                print("[DEBUG] GAME OVER after night narration")
                 self.game_winner = winner
                 self.state = "GAMEOVER"
                 self.expected_signals = set()
@@ -405,30 +423,47 @@ class MafiaGame:
                 await self.broadcast_restart_status()
                 return
             
+            # Reset ready_to_vote flags for new voting phase
+            for player_data in self.players.values():
+                player_data["ready_to_vote"] = False
+            
+            self.state = "READYTOVOTE"
+            self.expected_signals = {"voiceCommand"}
+            print("[DEBUG] Moving to ready to vote stage - players must say 'ready to vote'")
+
+        # READYTOVOTE STATE: Wait for all alive players to say they're ready to vote
+        if self.state == "READYTOVOTE" and self.check_everyone_ready_to_vote():
+            print("[DEBUG] All players ready to vote! Moving to voting stage...")
             self.state = "VOTE"
             self.expected_signals = {"voiceCommand", "target"}
             print("[DEBUG] Moving to day voting stage")
             await self.broadcast_vote()
 
+        # VOTE STATE: Wait for all alive players to vote someone out
         if self.state == "VOTE" and self.everyone_voted():
             voted_out = self.handle_vote()
             if len(voted_out) != 1:
-                print(f"[DEBUG] Vote tied between {[player for player in voted_out]}")
+                print(f"[DEBUG] Vote tied between {voted_out}")
                 await self.broadcast("vote_result_tie", voted_out)
                 await self.broadcast_vote()
                 return
 
-            print(f"[DEBUG] Player voted out: {voted_out[0]}")
-            if self.mafia_count == 2 and voted_out in [self.mafia_name_one, self.mafia_name_two]:
+            voted_out_name = voted_out[0]
+            print(f"[DEBUG] Player voted out: {voted_out_name}")
+            
+            # If mafia member was voted out, decrease mafia count
+            if self.mafia_count == 2 and voted_out_name in [self.mafia_name_one, self.mafia_name_two]:
                 self.mafia_count -= 1
-                if voted_out == self.mafia_name_one:
-                    self.mafia_name_one = self.mafia_name_one
-            self.players[voted_out[0]]["alive"] = False
-            await self.broadcast("vote_result", voted_out)
+                if voted_out_name == self.mafia_name_one:
+                    self.mafia_name_one = self.mafia_name_two
+            
+            self.players[voted_out_name]["alive"] = False
+            await self.broadcast("vote_result", voted_out_name)
             
             # Check if game is over after vote
             winner = self.check_game_over()
             if winner:
+                print("[DEBUG] GAME OVER after day vote")
                 self.game_winner = winner
                 self.state = "GAMEOVER"
                 self.expected_signals = set()
@@ -439,42 +474,67 @@ class MafiaGame:
                 await self.broadcast_restart_status()
                 return
             
+            # Reset votes and head positions for next round
+            for player_data in self.players.values():
+                player_data["vote"] = None
+                player_data["kill"] = None
+                player_data["save"] = None
+                player_data["head"] = "up"
+                player_data["ready_to_vote"] = False
+            
             self.state = "HEADSDOWN"
             self.expected_signals = {"headUp", "headDown"}
             print("[DEBUG] Moving back to night phase")
-            await self.broadcast("heads_down", voted_out)
-            
+            await self.broadcast("heads_down", voted_out_name)
+        
+        # GAMEOVER STATE: Wait for all players to vote for restart
         if self.state == "GAMEOVER" and self.check_everyone_wants_restart():
             print("[DEBUG] All players want to restart! Restarting game...")
             self.reset_game_state()
             await self.broadcast_lobby_status()
-        
-# ------------------ SERVER ------------------
 
-game = MafiaGame()
+
+# Global lock for thread safety
 lock = asyncio.Lock()
+
+# Global game instance - shared across all players
+game: MafiaGame = MafiaGame()
 
 
 async def handler(ws: WebSocketServerProtocol):
-    player_name = None
-    
+    player_name: str | None = None
+
     try:
-        async for message in ws:
-            msg = parse_json(message)
+        async for msg_text in ws:
+            msg = parse_json(msg_text)
             if not msg:
                 continue
-            
-            # Handle control messages (voice commands from frontend)
+
+            # Handle voice commands
             if msg.get("action") == "control":
-                target = msg.get("target")
-                ctrl_code = None
-                ctrl_name = None
+                ctrl_code = msg.get("target")
                 
-                if isinstance(target, dict):
-                    ctrl_code = target.get("code")
-                    ctrl_name = target.get("name")
+                # LOBBY: Voice command code 2 = "assign players" (ready to start)
+                if ctrl_code == VOICE_COMMAND_READY_ASSIGN and game.state == "LOBBY":
+                    print(f"[VOICE_COMMAND] Player {player_name} said 'assign players' - marking as ready")
+                    if player_name and player_name in game.players:
+                        async with lock:
+                            game.players[player_name]["ready"] = True
+                            await game.broadcast_lobby_status()
+                            await game.update()
+                    continue
                 
-                print(f"[VOICE_COMMAND] Received: player={player_name}, code={ctrl_code}, action={ctrl_name}")
+                # READYTOVOTE PHASE: Voice command code 3 = "ready to vote"
+                if ctrl_code == VOICE_COMMAND_READY_VOTE and game.state == "READYTOVOTE":
+                    print(f"[VOICE_COMMAND] Player {player_name} said 'ready to vote'")
+                    if player_name and player_name in game.players:
+                        async with lock:
+                            game.players[player_name]["ready_to_vote"] = True
+                            print(f"[VOICE_COMMAND] {player_name} is ready to vote")
+                            await game.update()
+                    continue
+                
+                print(f"[VOICE_COMMAND] Received: player={player_name}, code={ctrl_code}")
                 continue
             
             # Handle setup message
@@ -485,6 +545,7 @@ async def handler(ws: WebSocketServerProtocol):
                     print(f"[DEBUG] server adding rpi: {player_name}")
                     game.rpis[player_name] = ws
                     continue
+                
                 print(f"[DEBUG] server adding player: {player_name}")
                 
                 async with lock:
@@ -507,6 +568,7 @@ async def handler(ws: WebSocketServerProtocol):
                     game.players[player_name] = {
                         "setup": True,
                         "ready": False,
+                        "ready_to_vote": False,
                         "restart": False,
                         "head": "up",
                         "vote": None,
@@ -567,7 +629,7 @@ async def handler(ws: WebSocketServerProtocol):
                         player_data["head"] = "down"
                     elif action == "voiceCommand" or action == 'target':
                         target = msg.get("target")
-                        print(f"[DEBUG], received target signal with target: {target}, of type: {type(target)}")
+                        print(f"[DEBUG] Received target signal with target: {target}, of type: {type(target)}")
 
                         if isinstance(target, str) and target.isnumeric():
                             target = int(target)
@@ -582,52 +644,35 @@ async def handler(ws: WebSocketServerProtocol):
                         elif (player_name == game.doctor_name_one or player_name == game.doctor_name_two) and game.state == "DOCTORVOTE":
                             player_data["save"] = target
                             print(f"[DEBUG] {player_name} voted to save: {target}")
-                        else:
+                        elif game.state == "VOTE":
                             player_data["vote"] = target
                             print(f"[DEBUG] {player_name} voted for: {target}")
 
                 await game.update()
 
     except websockets.exceptions.ConnectionClosedError:
-        print(f"[DEBUG] Connection closed unexpectedly for player: {player_name}, going back to day phase")
+        print(f"[DEBUG] Connection closed unexpectedly for player: {player_name}")
     except Exception as e:
         print(f"[ERROR] Handler error for {player_name}: {e}")
         import traceback
         traceback.print_exc()
     finally:
         if player_name:
-            print(f"[DEBUG] Cleaning up player {player_name} and restarting game")
+            print(f"[DEBUG] Cleaning up player {player_name}")
             async with lock:
-                await clean_player(player_name, game, ws)
+                await clean_player(player_name, ws)
             print(f"[DEBUG] Player {player_name} removed from game")
 
-async def clean_player(player_name: str, game: MafiaGame, ws: WebSocketServerProtocol):
+async def clean_player(player_name: str, ws: WebSocketServerProtocol):
         print("[DEBUG] attempting to gracefully resolve game logic")
-        # if mafia left, kill him and check that if civilians won game, if they didn't, then continue
         if player_name:
             print(f"[DEBUG]: player_name: {player_name}")
             game.players[player_name]["alive"] = False
-            await game.broadcast("restart_status", None)
+            await game.broadcast_restart_status()
             if player_name in game.rpis:
                 ws_rpi = game.rpis[player_name]
                 await send_json(ws_rpi, player_name, "disconnect", None)
                 del game.rpis[player_name]
-        # print(f"[DEBUG] player name being kicked out: {player_name}, mafia name_one: {game.mafia_name_one}, 2: {game.mafia_name_two}")
-        # if player_name in [game.mafia_name_one, game.mafia_name_two]:
-        #     if game.mafia_count == 2:
-        #         game.mafia_count -= 1
-        #         if player_name == game.mafia_name_one:
-        #             game.mafia_name_one = game.mafia_name_two
-        #
-        # elif player_name in [game.doctor_name_one, game.doctor_name_two]:
-        #     if game.doctor_count == 2:
-        #         game.doctor_count -= 1
-        #         if player_name == game.doctor_name_one:
-        #             game.doctor_name_one = game.doctor_name_two
-
-
-        # check if winner before deletions
-        # winner = game.check_game_over()
 
         if ws in game.clients:
             del game.clients[ws]
@@ -650,11 +695,7 @@ async def clean_player(player_name: str, game: MafiaGame, ws: WebSocketServerPro
         })
         await game.broadcast_restart_status()
 
-        
-        # Broadcast updated lobby status if still in lobby
-                
         print(f"[DEBUG] Player {player_name} removed from game")
-        
 
 
 async def main():

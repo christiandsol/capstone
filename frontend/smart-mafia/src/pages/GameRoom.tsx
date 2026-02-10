@@ -263,7 +263,7 @@ export default function GameRoom({ playerName }: GameProps) {
           </div>
         )}
 
-        {/* Lobby Status & Ready Button */}
+        {/* Lobby Status & Voice Commands / Ready Button */}
         {!gameHasStarted && !gameIsOver && lobbyStatus && (
           <div style={{
             background: '#2a2a2a',
@@ -306,31 +306,56 @@ export default function GameRoom({ playerName }: GameProps) {
               ))}
             </div>
 
-            {/* Ready Button */}
-            {!hasClickedReady && (
-              <button
-                onClick={handleReady}
-                style={{
-                  marginTop: '20px',
-                  padding: '15px 30px',
-                  fontSize: '20px',
-                  fontWeight: 'bold',
-                  background: "rgb(139, 10, 21)",
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  width: '100%',
-                  transition: 'background 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = '#b01020'}
-                onMouseOut={(e) => e.currentTarget.style.background = 'rgb(139, 10, 21)'}
-              >
-                READY TO START
-              </button>
-            )}
+            {/* Voice Controls or Ready Button */}
+            {!hasClickedReady ? (
+              <>
+                {/* Show voice controls if stream is started */}
+                {isStarted && (
+                  <div style={{ marginTop: '20px' }}>
+                    <VoiceControls
+                      isListening={isListening}
+                      onStart={startVoice}
+                      onStop={stopVoice}
+                      isMuted={isMuted}
+                      onToggleMute={toggleAudio}
+                    />
+                    <p style={{
+                      fontSize: '14px',
+                      color: '#ffaa00',
+                      marginTop: '10px',
+                      textAlign: 'center',
+                      fontStyle: 'italic'
+                    }}>
+                      Say "assign players" to mark yourself ready!
+                    </p>
+                  </div>
+                )}
 
-            {hasClickedReady && (
+                {/* Show button if stream not started yet */}
+                {!isStarted && (
+                  <button
+                    onClick={handleReady}
+                    style={{
+                      marginTop: '20px',
+                      padding: '15px 30px',
+                      fontSize: '20px',
+                      fontWeight: 'bold',
+                      background: "rgb(139, 10, 21)",
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      width: '100%',
+                      transition: 'background 0.2s'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.background = '#b01020'}
+                    onMouseOut={(e) => e.currentTarget.style.background = 'rgb(139, 10, 21)'}
+                  >
+                    READY TO START
+                  </button>
+                )}
+              </>
+            ) : (
               <div style={{
                 marginTop: '20px',
                 padding: '15px',
@@ -346,7 +371,8 @@ export default function GameRoom({ playerName }: GameProps) {
           </div>
         )}
 
-        {isStarted && gameHasStarted && (
+        {/* Voice Controls for Game In Progress */}
+        {isStarted && gameHasStarted && !gameIsOver && (
           <VoiceControls
             isListening={isListening}
             onStart={startVoice}
