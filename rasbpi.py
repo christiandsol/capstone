@@ -32,25 +32,45 @@ async def send_signal_to_server(ws, action, target, name):
     }
     await ws.send(json.dumps(msg))
 
-# Use a queue to communicate between input thread and async code
-input_queue = asyncio.Queue()
+class AsyncInput:
+    """Helper class to handle async input in a thread-safe way"""
+    def __init__(self):
+        self.loop = None
+        self.queue = None
+    
+    def set_loop(self, loop):
+        """Set the event loop after it's created"""
+        self.loop = loop
+        self.queue = asyncio.Queue(loop=loop)
+    
+    def input_thread_worker(self, prompt: str):
+        """Run in a separate thread to get input without blocking the event loop"""
+        result = input(prompt)
+        # Schedule the coroutine on the event loop from the thread
+        asyncio.run_coroutine_threadsafe(self._put_result(result), self.loop)
+    
+    async def _put_result(self, result):
+        """Put result in queue"""
+        await self.queue.put(result)
+    
+    async def get_input(self, prompt: str = ""):
+        """Non-blocking input using a separate thread"""
+        if self.loop is None or self.queue is None:
+            raise RuntimeError("AsyncInput not initialized with event loop")
+        
+        # Start input in background thread
+        thread = threading.Thread(target=self.input_thread_worker, args=(prompt,), daemon=True)
+        thread.start()
+        
+        # Wait for the result
+        return await self.queue.get()
 
-def input_thread_worker(prompt: str):
-    """Run in a separate thread to get input without blocking the event loop"""
-    result = input(prompt)
-    asyncio.run_coroutine_threadsafe(input_queue.put(result), loop)
-
-async def async_input(prompt: str = ""):
-    """Non-blocking input using a separate thread"""
-    # Start input in background thread
-    thread = threading.Thread(target=input_thread_worker, args=(prompt,), daemon=True)
-    thread.start()
-    # Wait for the result
-    return await input_queue.get()
+# Global instance
+async_input_helper = AsyncInput()
 
 async def handle_debug_vote(ws, name):
     print("\n[Pi] Ready to record vote. Go ahead and vote for a player")
-    vote = await async_input("[Pi] Enter a player number (1-8): ")
+    vote = await async_input_helper.get_input("[Pi] Enter a player number (1-8): ")
     
     if not vote.strip().isnumeric():
         print("[Pi] Vote not numeric, try again")
@@ -95,7 +115,7 @@ async def handle_vote(ws, imu, recognizer, name):
     
     # Ask for confirmation before sending vote
     print(f"[Pi] Recognized gesture as digit {digit} (vote for player {digit})")
-    confirm = await async_input(f"[Pi] Confirm vote for player {digit}? (y/n): ")
+    confirm = await async_input_helper.get_input(f"[Pi] Confirm vote for player {digit}? (y/n): ")
     
     if confirm.strip().lower() != "y":
         print("[Pi] Vote cancelled.")
@@ -111,7 +131,7 @@ async def handle_vote(ws, imu, recognizer, name):
 
 async def rpi_helper(ws, name, imu, recognizer):
     print("[Pi] Are you running on your raspberry pi? (y for raspberry pi, n for local debugging): ", end='')
-    cmd = await async_input()
+    cmd = await async_input_helper.get_input()
     cmd = cmd.strip().lower()
     
     try:
@@ -158,8 +178,9 @@ async def rpi_helper(ws, name, imu, recognizer):
         print("[DEBUG] Player leaving...")
 
 async def rpi_handler(name):
-    global loop
+    # Set the event loop for async input BEFORE using it
     loop = asyncio.get_event_loop()
+    async_input_helper.set_loop(loop)
     
     # uri = f"ws://{SERVER_IP}:{SERVER_PORT}"
     uri = f"wss://{SERVER_IP}/ws"
