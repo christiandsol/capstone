@@ -58,16 +58,16 @@ export default function GameRoom({ playerName }: GameProps) {
   const { localVideoRef, localStream, isUsingTestVideo, startCamera, startTestVideo } = useMediaStream(setStatus);
 
   // Head detection
-  useHeadDetection(
-    isUsingTestVideo ? { current: null } : localVideoRef,
-    (position) => {
-      if (!isUsingTestVideo) {
-        setCurrentHead(position)
-        setHeadPosition(position);
-        sendHeadPosition(position);
-      }
-    }
-  );
+  // useHeadDetection(
+  //   isUsingTestVideo ? { current: null } : localVideoRef,
+  //   (position) => {
+  //     if (!isUsingTestVideo) {
+  //       setCurrentHead(position)
+  //       setHeadPosition(position);
+  //       sendHeadPosition(position);
+  //     }
+  //   }
+  // );
 
   // WebRTC peer connections
   const { remoteStreams } = useWebRTC(localStream, setStatus, playerName, playerId);
