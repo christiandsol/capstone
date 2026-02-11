@@ -152,12 +152,12 @@ export const useGameSocket = (
                         onStatusChange(newStatus);
                     }
 
-                    if (data.action === 'heads_down') {
-                        console.log("[DEBUG] Moving on to night phase, everyone put head down please")
-                        const newStatus = "Moving on to night phase, everyone put head down please";
-                        lastStatusRef.current = newStatus;
-                        onStatusChange(newStatus);
-                    }
+                    // if (data.action === 'heads_down') {
+                    //     console.log("[DEBUG] Moving on to night phase, everyone put head down please")
+                    //     const newStatus = "Moving on to night phase, everyone put head down please";
+                    //     lastStatusRef.current = newStatus;
+                    //     onStatusChange(newStatus);
+                    // }
 
                     if (data.action === 'game_over') {
                         setGameOverData(data.target);
