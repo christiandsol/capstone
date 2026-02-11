@@ -84,50 +84,53 @@ async def handle_debug_vote(ws, name):
 async def handle_vote(ws, imu, recognizer, name):
     """
     Handles the voting using gesture recognition
+    Flow: Press Enter to start -> Record gesture -> Confirm result
     """
-    print("\n[Pi] Ready to record gesture. Move the BerryIMU to vote (1-8)...")
-    
-    # Record gesture sequence (1 second)
-    print("[Pi] Recording gesture... move the BerryIMU now.")
-    samples = []
-    duration_s = 1.0
-    sample_rate_hz = 50.0
-    dt = 1.0 / sample_rate_hz
-    num_samples = int(duration_s * sample_rate_hz)
-    
-    for i in range(num_samples):
-        sample = imu.read_sample()
-        samples.append(sample)
-        time.sleep(dt)
-    
-    print("[Pi] Recording complete, recognizing...")
-    
-    # Classify the gesture
-    digit = recognizer.classify(samples)
-    
-    if digit is None:
-        print("[Pi] Could not recognize gesture. Try again with a clearer movement.")
-        return False
-    
-    if digit not in range(1, 9):
-        print(f"[Pi] Recognized digit {digit}, but only 1-8 are valid. Ignoring.")
-        return False
-    
-    # Ask for confirmation before sending vote
-    print(f"[Pi] Recognized gesture as digit {digit} (vote for player {digit})")
-    confirm = await async_input_helper.get_input(f"[Pi] Confirm vote for player {digit}? (y/n): ")
-    
-    if confirm.strip().lower() != "y":
-        print("[Pi] Vote cancelled.")
-        return False
-    
-    # Set action and target based on gesture recognition
-    action = "target"
-    target = digit
-    
-    print(f"[Pi] Sending vote for player {digit}...")
-    await send_signal_to_server(ws, action, target, name)
-    return True
+    while True:
+        print("\n[Pi] Ready to record gesture. Move the BerryIMU to vote (1-8)...")
+        await async_input_helper.get_input("[Pi] Press Enter to start recording: ")
+        
+        # Record gesture sequence (1 second)
+        print("[Pi] Recording gesture... move the BerryIMU now.")
+        samples = []
+        duration_s = 1.0
+        sample_rate_hz = 50.0
+        dt = 1.0 / sample_rate_hz
+        num_samples = int(duration_s * sample_rate_hz)
+        
+        for i in range(num_samples):
+            sample = imu.read_sample()
+            samples.append(sample)
+            time.sleep(dt)
+        
+        print("[Pi] Recording complete, recognizing...")
+        
+        # Classify the gesture
+        digit = recognizer.classify(samples)
+        
+        if digit is None:
+            print("[Pi] Could not recognize gesture. Try again with a clearer movement.")
+            continue
+        
+        if digit not in range(1, 9):
+            print(f"[Pi] Recognized digit {digit}, but only 1-8 are valid. Ignoring.")
+            continue
+        
+        # Ask for confirmation before sending vote
+        print(f"[Pi] Recognized gesture as digit {digit} (vote for player {digit})")
+        confirm = await async_input_helper.get_input(f"[Pi] Confirm vote for player {digit}? (y/n): ")
+        
+        if confirm.strip().lower() != "y":
+            print("[Pi] Vote cancelled. Recording new gesture...")
+            continue
+        
+        # Set action and target based on gesture recognition
+        action = "target"
+        target = digit
+        
+        print(f"[Pi] Sending vote for player {digit}...")
+        await send_signal_to_server(ws, action, target, name)
+        return True
 
 async def rpi_helper(ws, name, imu, recognizer):
     print("[Pi] Are you running on your raspberry pi? (y for raspberry pi, n for local debugging): ", end='')
