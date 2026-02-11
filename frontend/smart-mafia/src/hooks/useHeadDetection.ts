@@ -20,7 +20,10 @@ export const useHeadDetection = (
 
     useEffect(() => {
         const video = videoRef.current;
-        if (!video) return;
+        if (!video) {
+            console.log("[Detection] No video ref provided");
+            return;
+        }
 
         let cancelled = false;
 
@@ -66,35 +69,26 @@ export const useHeadDetection = (
             });
         };
 
-        const requestCameraAccess = async () => {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: { ideal: 1280 }, height: { ideal: 720 } },
-                });
-                video.srcObject = stream;
-                console.log("[Camera] Access granted");
-            } catch (err) {
-                console.error("[Camera] Access denied:", err);
-                throw err;
-            }
-        };
-
         const waitForVideoToPlay = async () => {
+            // Don't request camera - video should already have a stream from useMediaStream
+
             if (video.paused) {
                 try {
                     await video.play();
-                    console.log("[Video] Playing");
+                    console.log("[Detection] Video playing");
                 } catch (err) {
-                    console.error("[Video] Failed to play:", err);
+                    console.error("[Detection] Failed to play video:", err);
+                    // Don't throw - video might already be playing
                 }
             }
 
+            // Wait for video dimensions to be available
             if (video.videoWidth === 0 || video.videoHeight === 0) {
-                console.log("[Video] Waiting for dimensions...");
+                console.log("[Detection] Waiting for video dimensions...");
                 await new Promise<void>((resolve) => {
                     const checkDimensions = () => {
                         if (video.videoWidth > 0 && video.videoHeight > 0) {
-                            console.log(`[Video] Got dimensions: ${video.videoWidth}x${video.videoHeight}`);
+                            console.log(`[Detection] Video dimensions: ${video.videoWidth}x${video.videoHeight}`);
                             resolve();
                         } else {
                             setTimeout(checkDimensions, 100);
@@ -109,7 +103,6 @@ export const useHeadDetection = (
             try {
                 console.log("[Detection] Starting...");
 
-                await requestCameraAccess();
                 await loadScriptIfNeeded();
                 await waitForVideoToPlay();
 
@@ -123,7 +116,6 @@ export const useHeadDetection = (
                 const faceMesh = new window.FaceMesh({
                     locateFile: (file: string) => {
                         const url = `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@${MEDIAPIPE_VERSION}/${file}`;
-                        console.log(`[FaceMesh] Loading resource: ${file}`);
                         return url;
                     },
                 });
@@ -209,13 +201,10 @@ export const useHeadDetection = (
             if (faceMeshRef.current?.close) {
                 try {
                     faceMeshRef.current.close();
+                    console.log("[Detection] FaceMesh closed successfully");
                 } catch (err) {
                     console.error("[Detection] Error closing FaceMesh:", err);
                 }
-            }
-
-            if (video.srcObject instanceof MediaStream) {
-                video.srcObject.getTracks().forEach(track => track.stop());
             }
         };
     }, [videoRef, onHeadPositionChange]);
