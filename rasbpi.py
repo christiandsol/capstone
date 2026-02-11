@@ -190,7 +190,7 @@ async def rpi_handler(name):
 
     print(f"[DEBUG] Connecting to {uri}")
 
-    async with websockets.connect(uri, open_timeout=None, close_timeout=None, ping_interval=None, ping_timeout=None) as ws:
+    async with websockets.connect(uri, open_timeout=10, close_timeout=10, ping_interval=20, ping_timeout=20) as ws:
         print('[DEBUG] Connected to server')
         setup_msg = {
             "action": "setup",

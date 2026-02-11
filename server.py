@@ -698,7 +698,7 @@ async def clean_player(player_name: str, ws: WebSocketServerProtocol):
 
 
 async def main():
-    async with websockets.serve(handler, HOST, PORT, ping_interval=None, ping_timeout=None, close_timeout=10):
+    async with websockets.serve(handler, HOST, PORT, ping_interval=20, ping_timeout=20, close_timeout=10):
         print(f"WebSocket server running on {PORT}")
         await asyncio.Future()
 
