@@ -101,7 +101,7 @@ async def handle_vote(ws, imu, recognizer, name):
         for i in range(num_samples):
             sample = imu.read_sample()
             samples.append(sample)
-            time.sleep(dt)
+            await asyncio.sleep(dt)  # Non-blocking sleep that allows event loop to run
         
         print("[Pi] Recording complete, recognizing...")
         
