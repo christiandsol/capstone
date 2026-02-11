@@ -141,7 +141,7 @@ async def handle_vote(ws, imu, recognizer, name, loop):
         
         # Set action and target based on gesture recognition
         action = "target"
-        target = digit
+        target = str(digit)
         
         print(f"[Pi] Sending vote for player {digit}...")
         await send_signal_to_server(ws, action, target, name)
