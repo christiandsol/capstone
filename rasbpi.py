@@ -5,6 +5,7 @@ import websockets
 from websockets.typing import Data
 import sys
 import os
+import threading
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'berryIMU'))
 from gesturetwo import BerryIMUInterface, GestureRecognizer
@@ -31,76 +32,88 @@ async def send_signal_to_server(ws, action, target, name):
     }
     await ws.send(json.dumps(msg))
 
-async def handle_debug_vote(ws, name):
-    while True:
-        print("\n[Pi] Ready to record vote. Go ahead and vote for a player")
-        print("[Pi] Press Enter to start recording, or 'q' to quit: ", end='')
-        vote = input().strip().lower()
-        if not vote.isnumeric():
-            print("[Pi] Vote not numeric, try again", end='')
-            continue
-        action = "target"
+# Use a queue to communicate between input thread and async code
+input_queue = asyncio.Queue()
 
-        print(f"[Pi] Sending vote for player {vote}...")
-        await send_signal_to_server(ws, action, vote, name)
-        break
+def input_thread_worker(prompt: str):
+    """Run in a separate thread to get input without blocking the event loop"""
+    result = input(prompt)
+    asyncio.run_coroutine_threadsafe(input_queue.put(result), loop)
+
+async def async_input(prompt: str = ""):
+    """Non-blocking input using a separate thread"""
+    # Start input in background thread
+    thread = threading.Thread(target=input_thread_worker, args=(prompt,), daemon=True)
+    thread.start()
+    # Wait for the result
+    return await input_queue.get()
+
+async def handle_debug_vote(ws, name):
+    print("\n[Pi] Ready to record vote. Go ahead and vote for a player")
+    vote = await async_input("[Pi] Enter a player number (1-8): ")
+    
+    if not vote.strip().isnumeric():
+        print("[Pi] Vote not numeric, try again")
+        return False
+    
+    action = "target"
+    print(f"[Pi] Sending vote for player {vote}...")
+    await send_signal_to_server(ws, action, vote, name)
+    return True
 
 async def handle_vote(ws, imu, recognizer, name):
     """
-    Handles the voting
+    Handles the voting using gesture recognition
     """
-    while True:
-        print("\n[Pi] Ready to record gesture. Move the BerryIMU to vote (1-8)...")
-        print("[Pi] Press Enter to start recording, or 'q' to quit: ", end='')
-        cmd = input().strip().lower()
-        
-        # Record gesture sequence (1 second)
-        print("[Pi] Recording gesture... move the BerryIMU now.")
-        samples = []
-        duration_s = 1.0
-        sample_rate_hz = 50.0
-        dt = 1.0 / sample_rate_hz
-        num_samples = int(duration_s * sample_rate_hz)
-        
-        for i in range(num_samples):
-            sample = imu.read_sample()
-            samples.append(sample)
-            await asyncio.sleep(dt)
-            # time.sleep(dt)
-        
-        print("[Pi] Recording complete, recognizing...")
-        
-        # Classify the gesture
-        digit = recognizer.classify(samples)
-        
-        if digit is None:
-            print("[Pi] Could not recognize gesture. Try again with a clearer movement.")
-            continue
-        
-        if digit not in range(1, 9):
-            print(f"[Pi] Recognized digit {digit}, but only 1-8 are valid. Ignoring.")
-            continue
-        
-        # Ask for confirmation before sending vote
-        print(f"[Pi] Recognized gesture as digit {digit} (vote for player {digit})")
-        confirm = input(f"[Pi] Confirm vote for player {digit}? (y/n): ").strip().lower()
-        
-        if confirm != "y":
-            print("[Pi] Vote cancelled. Recording new gesture...")
-            continue
-        
-        # Set action and target based on gesture recognition
-        action = "target"
-        target = digit
-        
-        print(f"[Pi] Sending vote for player {digit}...")
-        await send_signal_to_server(ws, action, target, name)
-        # time.sleep(0.1)
-        break
+    print("\n[Pi] Ready to record gesture. Move the BerryIMU to vote (1-8)...")
+    
+    # Record gesture sequence (1 second)
+    print("[Pi] Recording gesture... move the BerryIMU now.")
+    samples = []
+    duration_s = 1.0
+    sample_rate_hz = 50.0
+    dt = 1.0 / sample_rate_hz
+    num_samples = int(duration_s * sample_rate_hz)
+    
+    for i in range(num_samples):
+        sample = imu.read_sample()
+        samples.append(sample)
+        time.sleep(dt)
+    
+    print("[Pi] Recording complete, recognizing...")
+    
+    # Classify the gesture
+    digit = recognizer.classify(samples)
+    
+    if digit is None:
+        print("[Pi] Could not recognize gesture. Try again with a clearer movement.")
+        return False
+    
+    if digit not in range(1, 9):
+        print(f"[Pi] Recognized digit {digit}, but only 1-8 are valid. Ignoring.")
+        return False
+    
+    # Ask for confirmation before sending vote
+    print(f"[Pi] Recognized gesture as digit {digit} (vote for player {digit})")
+    confirm = await async_input(f"[Pi] Confirm vote for player {digit}? (y/n): ")
+    
+    if confirm.strip().lower() != "y":
+        print("[Pi] Vote cancelled.")
+        return False
+    
+    # Set action and target based on gesture recognition
+    action = "target"
+    target = digit
+    
+    print(f"[Pi] Sending vote for player {digit}...")
+    await send_signal_to_server(ws, action, target, name)
+    return True
 
 async def rpi_helper(ws, name, imu, recognizer):
     print("[Pi] Are you running on your raspberry pi? (y for raspberry pi, n for local debugging): ", end='')
-    cmd = input().strip().lower()
+    cmd = await async_input()
+    cmd = cmd.strip().lower()
+    
     try:
         async for message in ws:
             msg = parse_json(message)
@@ -108,6 +121,7 @@ async def rpi_helper(ws, name, imu, recognizer):
                 continue
             print(f"[DEBUG]: {msg}")
             action = msg.get("action")
+            
             if action in ["civilian", "mafia", "doctor"]:
                 role = action
                 print(f"[DEBUG] received role: {action}")
@@ -116,21 +130,24 @@ async def rpi_helper(ws, name, imu, recognizer):
             if action == "disconnect":
                 print("[DEBUG] Disconnecting...")
                 return
+                
             if action == "restart_status":
                 print("[DEBUG] Received restart, restarting game, your role may change")
                 continue
-            # Only act when server asks you to
-            # if action in ["vote", "kill", "save"]:
-            #     if action == "vote":
-            #         await handle_vote(ws, imu, recognizer, name)
-            #     elif action == "kill" or action == "save":
-            #         await handle_vote(ws, imu, recognizer, name)
-        
-            # server tells us it's our turn to vote
-            if cmd == 'y':
-                await handle_vote(ws, imu, recognizer, name)
-            else:
-                await handle_debug_vote(ws, name)
+            
+            # Only handle voting when the server asks us to (vote, kill, save)
+            if action in ["vote", "kill", "save"]:
+                if cmd == 'y':
+                    success = await handle_vote(ws, imu, recognizer, name)
+                    if not success:
+                        print("[Pi] Vote failed, waiting for next server message...")
+                else:
+                    success = await handle_debug_vote(ws, name)
+                    if not success:
+                        print("[Pi] Vote failed, waiting for next server message...")
+                # Continue to next message without breaking
+                continue
+                
     except websockets.exceptions.ConnectionClosedError:
         print(f"[DEBUG] Connection closed unexpectedly")
     except Exception as e:
@@ -141,6 +158,9 @@ async def rpi_helper(ws, name, imu, recognizer):
         print("[DEBUG] Player leaving...")
 
 async def rpi_handler(name):
+    global loop
+    loop = asyncio.get_event_loop()
+    
     # uri = f"ws://{SERVER_IP}:{SERVER_PORT}"
     uri = f"wss://{SERVER_IP}/ws"
 
