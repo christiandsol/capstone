@@ -39,6 +39,7 @@ export default function GameRoom({ playerName }: GameProps) {
     lobbyStatus,
     restartStatus,
     gameOverData,
+    deadPlayers,
     sendHeadPosition,
     setCurrentHead,
     sendVoiceCommand,
@@ -419,6 +420,7 @@ export default function GameRoom({ playerName }: GameProps) {
                 stream={streamInfo.stream}
                 playerName={streamInfo.playerName}
                 playerId={streamInfo.playerId}
+                isDead={streamInfo.playerName ? deadPlayers.has(streamInfo.playerName) : false}
               />
             ))
           )}

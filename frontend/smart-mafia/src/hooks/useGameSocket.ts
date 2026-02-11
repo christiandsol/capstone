@@ -26,6 +26,7 @@ interface UseGameSocketReturn {
     lobbyStatus: LobbyStatus | null;
     restartStatus: RestartStatus | null;
     gameOverData: GameOverData | null;
+    deadPlayers: Set<string>;
     sendHeadPosition: (position: string) => void;
     setCurrentHead: (position: string) => void;
     sendVoiceCommand: (command: number) => void;
@@ -47,6 +48,7 @@ export const useGameSocket = (
     const [lobbyStatus, setLobbyStatus] = useState<LobbyStatus | null>(null);
     const [restartStatus, setRestartStatus] = useState<RestartStatus | null>(null);
     const [gameOverData, setGameOverData] = useState<GameOverData | null>(null);
+    const [deadPlayers, setDeadPlayers] = useState<Set<string>>(new Set());
     const hasSetupRef = useRef(false);
     const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const lastStatusRef = useRef<string>('');
@@ -109,6 +111,7 @@ export const useGameSocket = (
                             setGameOverData(null);
                             setRestartStatus(null);
                             setRole(null);
+                            setDeadPlayers(new Set()); // Reset dead players on restart
                         }
                         const { ready_count, total_count, min_players } = data.target;
                         // Only update status if we're still in lobby waiting for players
@@ -130,6 +133,7 @@ export const useGameSocket = (
                             console.log('[Game] All players agreed to restart!');
                             setGameOverData(null);
                             setRole(null);
+                            setDeadPlayers(new Set()); // Reset dead players on restart
                         }
                     }
 
@@ -177,21 +181,27 @@ export const useGameSocket = (
 
                     if (data.action === 'night_result') {
                         console.log('[Game] Night result:', data.target);
-                        const killed = data.target.killed
-                        const saved = data.target.saved
+                        const killed = data.target.killed;
+                        const saved = data.target.saved;
                         let newStatus = "";
                         if (killed != saved) {
-                            newStatus = `Mafia killed ${killed} in the night, and no one was there to save them, everyone discuss and say "ready to vote" when you are`
+                            // Player actually died during the night
+                            newStatus = `Mafia killed ${killed} in the night, and no one was there to save them. Everyone discuss and say "ready to vote" when you are.`;
+                            // Mark player as dead
+                            setDeadPlayers((prev: Set<string>) => new Set(prev).add(killed));
                         } else {
-                            newStatus = `Mafia killed ${killed} in the night, and they were SAVED, everyone discuss and say "ready to vote" when you are`
+                            // Player was targeted but saved
+                            newStatus = `Mafia killed ${killed} in the night, but they were SAVED 🙏. Everyone discuss and say "ready to vote" when you are.`;
                         }
                         lastStatusRef.current = newStatus;
                         onStatusChange(newStatus);
                     }
 
                     if (data.action === 'vote_result') {
-                        const vote_result = data.target
-                        const newStatus = `${vote_result} was voted out, moving back to night phase, everyone heads down so mafia can move`;
+                        const vote_result = data.target;
+                        const newStatus = `${vote_result} was voted out. Moving back to night phase, everyone heads down so mafia can move.`;
+                        // Mark player as dead
+                        setDeadPlayers((prev: Set<string>) => new Set(prev).add(vote_result));
                         lastStatusRef.current = newStatus;
                         onStatusChange(newStatus);
                         console.log('[Game] Vote result:', data.target);
@@ -333,6 +343,7 @@ export const useGameSocket = (
         lobbyStatus,
         restartStatus,
         gameOverData,
+        deadPlayers,
         sendHeadPosition,
         setCurrentHead,
         sendVoiceCommand,

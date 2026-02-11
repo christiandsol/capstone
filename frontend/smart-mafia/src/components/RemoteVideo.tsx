@@ -4,9 +4,10 @@ interface RemoteVideoProps {
   stream: MediaStream;
   playerName?: string;
   playerId?: number;
+  isDead?: boolean;
 }
 
-export const RemoteVideo: React.FC<RemoteVideoProps> = ({ stream, playerName, playerId }) => {
+export const RemoteVideo: React.FC<RemoteVideoProps> = ({ stream, playerName, playerId, isDead = false }) => {
   const ref = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -105,7 +106,7 @@ export const RemoteVideo: React.FC<RemoteVideoProps> = ({ stream, playerName, pl
             textAlign: 'center'
           }}
         >
-          {playerName && <div>{playerName}</div>}
+          {playerName && <div>{isDead ? '💀 ' : ''}{playerName}</div>}
           {playerId && <div style={{ fontSize: '12px', opacity: 0.9 }}>ID: {playerId}</div>}
         </div>
       )}
