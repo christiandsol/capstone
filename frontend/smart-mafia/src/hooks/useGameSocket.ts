@@ -53,6 +53,12 @@ export const useGameSocket = (
     const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const lastStatusRef = useRef<string>('');
 
+
+    const playTextToSpeech = (text: string) => {
+        const utterance = new SpeechSynthesisUtterance(text);
+        window.speechSynthesis.speak(utterance);
+    }
+
     const setCurrentHead = (position: string) => {
         currentHeadRef.current = position;
         sendHeadPosition(position);
@@ -84,6 +90,7 @@ export const useGameSocket = (
 
                     console.log('[Game] Connected to Python game server');
                     onStatusChange('Connected to game server!');
+                    playTextToSpeech('Connected to game server!')
 
                     if (!hasSetupRef.current) {
                         const setupMsg = { action: 'setup', target: playerName };
@@ -102,6 +109,7 @@ export const useGameSocket = (
                         setPlayerId(data.player);
                         lastStatusRef.current = `Registered as Player ${data.player}. Waiting in lobby...`;
                         onStatusChange(lastStatusRef.current);
+                        playTextToSpeech(lastStatusRef.current);
                     }
 
                     if (data.action === 'lobby_status') {
@@ -119,6 +127,7 @@ export const useGameSocket = (
                             const newStatus = `Lobby: ${ready_count}/${total_count} ready (min: ${min_players})`;
                             lastStatusRef.current = newStatus;
                             onStatusChange(newStatus);
+                            playTextToSpeech(newStatus);
                         }
                     }
 
@@ -128,6 +137,7 @@ export const useGameSocket = (
                         const newStatus = `Restart: ${restart_count}/${total_count} want to play again`;
                         lastStatusRef.current = newStatus;
                         onStatusChange(newStatus);
+                        playTextToSpeech(newStatus)
 
                         if (restart_count === total_count && total_count > 0) {
                             console.log('[Game] All players agreed to restart!');
@@ -154,6 +164,7 @@ export const useGameSocket = (
                         const newStatus = `You are ${data.player} - Role: ${data.action.toUpperCase()}`;
                         lastStatusRef.current = newStatus;
                         onStatusChange(newStatus);
+                        playTextToSpeech(newStatus)
                     }
 
                     // if (data.action === 'heads_down') {
@@ -177,6 +188,7 @@ export const useGameSocket = (
                         const newStatus = `GAME OVER! ${phrase} WON!`;
                         lastStatusRef.current = newStatus;
                         onStatusChange(newStatus);
+                        playTextToSpeech(newStatus)
                     }
 
                     if (data.action === 'night_result') {
@@ -195,6 +207,7 @@ export const useGameSocket = (
                         }
                         lastStatusRef.current = newStatus;
                         onStatusChange(newStatus);
+                        playTextToSpeech(newStatus)
                     }
 
                     if (data.action === 'vote_result') {
@@ -204,6 +217,7 @@ export const useGameSocket = (
                         setDeadPlayers((prev: Set<string>) => new Set(prev).add(vote_result));
                         lastStatusRef.current = newStatus;
                         onStatusChange(newStatus);
+                        playTextToSpeech(newStatus)
                         console.log('[Game] Vote result:', data.target);
                     }
 
@@ -212,6 +226,7 @@ export const useGameSocket = (
                         const newStatus = `Vote result was a tie between ${vote_result}, vote again`;
                         lastStatusRef.current = newStatus;
                         onStatusChange(newStatus);
+                        playTextToSpeech(newStatus)
                         console.log('[Game] Vote result was a tie, vote again:', data.target);
                     }
 
@@ -220,6 +235,7 @@ export const useGameSocket = (
                         const newStatus = 'Day Phase: Time to vote!';
                         lastStatusRef.current = newStatus;
                         onStatusChange(newStatus);
+                        playTextToSpeech(newStatus)
                     }
 
                     if (data.action === 'mafia_kill') {
@@ -228,6 +244,7 @@ export const useGameSocket = (
                         const newStatus = `Doctor, your turn to vote, everyone heads down`;
                         lastStatusRef.current = newStatus;
                         onStatusChange(newStatus);
+                        playTextToSpeech(newStatus)
                     }
 
                     if (data.action === 'doctor_save') {
@@ -236,6 +253,7 @@ export const useGameSocket = (
                         const newStatus = `Discussing night results...`;
                         lastStatusRef.current = newStatus;
                         onStatusChange(newStatus);
+                        playTextToSpeech(newStatus)
                     }
 
                     if (data.action === 'night_phase_kill') {
@@ -243,6 +261,7 @@ export const useGameSocket = (
                         const newStatus = 'Night Phase: Mafia is acting... Everyone else heads down';
                         lastStatusRef.current = newStatus;
                         onStatusChange(newStatus);
+                        playTextToSpeech(newStatus)
                     }
 
                     if (data.action == 'heads_down') {
@@ -255,6 +274,7 @@ export const useGameSocket = (
                     const newStatus = 'Error: Failed to connect to game server';
                     lastStatusRef.current = newStatus;
                     onStatusChange(newStatus);
+                    playTextToSpeech(newStatus)
                 };
 
                 gameSocketRef.current.onclose = () => {
@@ -263,6 +283,7 @@ export const useGameSocket = (
                     const newStatus = 'Disconnected from game server';
                     lastStatusRef.current = newStatus;
                     onStatusChange(newStatus);
+                    playTextToSpeech(newStatus)
 
                     if (isCurrentConnection) {
                         reconnectTimeoutRef.current = setTimeout(() => {
@@ -277,6 +298,7 @@ export const useGameSocket = (
                 const newStatus = `Error connecting to game server: ${errorMessage}`;
                 lastStatusRef.current = newStatus;
                 onStatusChange(newStatus);
+                playTextToSpeech(newStatus)
             }
         };
 
