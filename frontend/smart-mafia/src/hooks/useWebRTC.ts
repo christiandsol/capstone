@@ -24,15 +24,22 @@ export const useWebRTC = (
     const [remoteStreams, setRemoteStreams] = useState<RemoteStreamWithInfo[]>([]);
     const playerInfoMapRef = useRef<{ [socketId: string]: { name: string; id: number } }>({});
     const socketToStreamRef = useRef<{ [socketId: string]: MediaStream }>({});
+    const mySocketIdRef = useRef<string | null>(null);
 
     useEffect(() => {
-        if (!localStream) return;
+        if (!localStream) {
+            console.log('[WebRTC] No local stream, skipping initialization');
+            return;
+        }
 
-        console.log('[WebRTC] Connecting to Socket.IO:', API_CONFIG.SOCKET_IO_URL || 'Nginx proxy');
+        console.log('[WebRTC] Initializing with local stream');
+        console.log('[WebRTC] Local tracks:', localStream.getTracks().map(t => `${t.kind}(${t.enabled})`).join(', '));
+
         socketRef.current = io(API_CONFIG.SOCKET_IO_URL);
 
         socketRef.current.on('connect', () => {
-            console.log('[WebRTC] Connected to signaling server, socket ID:', socketRef.current?.id);
+            mySocketIdRef.current = socketRef.current?.id || null;
+            console.log('[WebRTC] Connected to signaling server, my socket ID:', mySocketIdRef.current);
             socketRef.current?.emit('join-room', 'test-room');
             onStatusChange('Connected to video server!');
         });
@@ -79,29 +86,36 @@ export const useWebRTC = (
                 ],
             });
 
-            // Add local tracks
+            // Add local tracks - CRITICAL: must happen before creating offer/answer
+            console.log(`[Peer] Adding ${localStream.getTracks().length} local tracks to peer ${otherId}`);
             localStream.getTracks().forEach((track: MediaStreamTrack) => {
-                console.log(`[Peer] Adding ${track.kind} track to peer ${otherId}`);
+                console.log(`[Peer] Adding ${track.kind} track (enabled: ${track.enabled}) to peer ${otherId}`);
                 peer.addTrack(track, localStream);
             });
 
             // Handle incoming tracks
             peer.ontrack = (event: RTCTrackEvent) => {
-                console.log(`[Peer] Received remote ${event.track.kind} track from ${otherId}`);
+                console.log(`[Peer] ===== ONTRACK EVENT from ${otherId} =====`);
+                console.log(`[Peer] Track kind: ${event.track.kind}`);
+                console.log(`[Peer] Track enabled: ${event.track.enabled}`);
+                console.log(`[Peer] Streams count: ${event.streams.length}`);
+
                 const remoteStream = event.streams[0];
 
                 if (!remoteStream) {
-                    console.warn(`[Peer] No stream associated with track from ${otherId}`);
+                    console.warn(`[Peer] ERROR: No stream associated with track from ${otherId}`);
                     return;
                 }
+
+                console.log(`[Peer] Stream ID: ${remoteStream.id}, Tracks: ${remoteStream.getTracks().map(t => t.kind).join(', ')}`);
 
                 // Store the mapping of socket ID to stream
                 socketToStreamRef.current[otherId] = remoteStream;
 
                 const playerInfo = playerInfoMapRef.current[otherId];
+                console.log(`[Peer] Player info for ${otherId}:`, playerInfo);
 
                 setRemoteStreams((prev) => {
-                    // Check if we already have this stream
                     const existing = prev.find((s) => s.socketId === otherId);
 
                     if (existing) {
@@ -122,28 +136,38 @@ export const useWebRTC = (
                             playerId: playerInfo?.id,
                         },
                     ];
-                    console.log(`[Peer] Added remote stream from ${otherId}. Total streams: ${updated.length}`);
+                    console.log(`[Peer] ===== ADDED remote stream from ${otherId}. Total streams: ${updated.length} =====`);
                     return updated;
                 });
             };
 
             peer.onicecandidate = (e: RTCPeerConnectionIceEvent) => {
                 if (e.candidate) {
-                    console.log(`[ICE] Sending ICE candidate to ${otherId}`);
                     socketRef.current?.emit('signal', { to: otherId, data: e.candidate });
                 }
             };
 
             peer.onconnectionstatechange = () => {
                 console.log(`[Peer] Connection state with ${otherId}: ${peer.connectionState}`);
+            };
 
-                if (peer.connectionState === 'failed' || peer.connectionState === 'disconnected') {
-                    console.log(`[Peer] Connection failed/disconnected with ${otherId}, will attempt to reconnect`);
-                }
+            peer.oniceconnectionstatechange = () => {
+                console.log(`[Peer] ICE connection state with ${otherId}: ${peer.iceConnectionState}`);
             };
 
             peerRefs.current[otherId] = peer;
             return peer;
+        };
+
+        const sendPlayerInfoToPeer = (peerId: string) => {
+            if (playerId === null) return;
+
+            console.log(`[Info] Sending player info to ${peerId}: ${playerName} (ID: ${playerId})`);
+            socketRef.current?.emit('player-info', {
+                to: peerId,
+                name: playerName,
+                id: playerId
+            });
         };
 
         const removeRemoteStreamsForSocketId = (socketId: string) => {
@@ -188,6 +212,9 @@ export const useWebRTC = (
                 await peer.setLocalDescription(offer);
                 console.log(`[Signal] Sending offer to ${id}`);
                 socketRef.current?.emit('signal', { to: id, data: offer });
+
+                // Send player info after creating offer
+                sendPlayerInfoToPeer(id);
             } catch (error) {
                 console.error('[Signal] Error creating offer:', error);
             }
@@ -262,6 +289,9 @@ export const useWebRTC = (
                     await peer.setLocalDescription(answer);
                     console.log(`[Signal] Sending answer to ${from}`);
                     socketRef.current?.emit('signal', { to: from, data: answer });
+
+                    // Send player info after creating answer
+                    sendPlayerInfoToPeer(from);
                 } else if (data.type === 'answer') {
                     console.log(`[Signal] Processing answer from ${from}`);
                     await peer.setRemoteDescription(new RTCSessionDescription(data));
