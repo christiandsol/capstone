@@ -10,11 +10,54 @@ export const RemoteVideo: React.FC<RemoteVideoProps> = ({ stream, playerName, pl
   const ref = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    if (ref.current && ref.current.srcObject !== stream) {
-      ref.current.srcObject = stream;
-      console.log(`Remote video set with stream: ${stream.id}`);
+    const video = ref.current;
+    if (!video) {
+      console.log(`[RemoteVideo] No video ref for ${playerName}`);
+      return;
     }
-  }, [stream]);
+
+    console.log(`[RemoteVideo] Setting stream for ${playerName}:`, {
+      streamId: stream.id,
+      tracks: stream.getTracks().map(t => `${t.kind}(${t.enabled})`).join(', ')
+    });
+
+    // Always set srcObject, don't compare
+    video.srcObject = stream;
+
+    // Log when stream actually plays
+    const handlePlaying = () => {
+      console.log(`[RemoteVideo] VIDEO PLAYING: ${playerName} - ${video.videoWidth}x${video.videoHeight}`);
+    };
+
+    const handleLoadedMetadata = () => {
+      console.log(`[RemoteVideo] Metadata loaded for ${playerName}`);
+    };
+
+    const handleError = (e: ErrorEvent) => {
+      console.error(`[RemoteVideo] Error for ${playerName}:`, e);
+    };
+
+    const handleCanPlay = () => {
+      console.log(`[RemoteVideo] Can play: ${playerName}`);
+    };
+
+    video.addEventListener('playing', handlePlaying);
+    video.addEventListener('loadedmetadata', handleLoadedMetadata);
+    video.addEventListener('error', handleError);
+    video.addEventListener('canplay', handleCanPlay);
+
+    // Explicitly call play
+    video.play().catch(err => {
+      console.error(`[RemoteVideo] Play failed for ${playerName}:`, err);
+    });
+
+    return () => {
+      video.removeEventListener('playing', handlePlaying);
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      video.removeEventListener('error', handleError);
+      video.removeEventListener('canplay', handleCanPlay);
+    };
+  }, [stream, playerName]);
 
   return (
     <div style={{ position: 'relative' }}>
