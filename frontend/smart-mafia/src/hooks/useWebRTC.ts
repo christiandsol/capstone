@@ -295,7 +295,6 @@ export const useWebRTC = (
             console.log(`[Signal] Received signal from ${from}, type: ${data.type || 'ice-candidate'}`);
 
             let peer = peerRefs.current[from];
-            const isNewPeer = !peer;
 
             if (!peer) {
                 peer = createPeer(from, false);
