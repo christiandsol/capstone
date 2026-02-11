@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import Rpi from "./Rpi";
+import GameRoom from "./GameRoom";
 //
 // const socket: Socket = io("http://163.192.0.247", {
 //   transports: ["websocket"],
@@ -150,7 +151,7 @@ export default function App() {
         />
       )}
 
-      {page === "rpi" && <Rpi
+      {page === "rpi" && <GameRoom
         playerName={playerName}
       />}
     </div>
