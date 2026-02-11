@@ -65,7 +65,8 @@ async def handle_vote(ws, imu, recognizer, name):
         for i in range(num_samples):
             sample = imu.read_sample()
             samples.append(sample)
-            time.sleep(dt)
+            await asyncio.sleep(dt)
+            # time.sleep(dt)
         
         print("[Pi] Recording complete, recognizing...")
         
@@ -94,7 +95,7 @@ async def handle_vote(ws, imu, recognizer, name):
         
         print(f"[Pi] Sending vote for player {digit}...")
         await send_signal_to_server(ws, action, target, name)
-        time.sleep(0.1)
+        # time.sleep(0.1)
         break
 
 async def rpi_helper(ws, name, imu, recognizer):
