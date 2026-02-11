@@ -191,7 +191,7 @@ export const useGameSocket = (
 
                     if (data.action === 'vote_result') {
                         const vote_result = data.target
-                        const newStatus = `${vote_result} was voted out`;
+                        const newStatus = `${vote_result} was voted out, moving back to night phase, everyone heads down so mafia can move`;
                         lastStatusRef.current = newStatus;
                         onStatusChange(newStatus);
                         console.log('[Game] Vote result:', data.target);
