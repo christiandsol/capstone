@@ -81,7 +81,23 @@ async def handle_debug_vote(ws, name):
     await send_signal_to_server(ws, action, vote, name)
     return True
 
-async def handle_vote(ws, imu, recognizer, name):
+def record_gesture_blocking(imu, duration_s: float = 1.0, sample_rate_hz: float = 50.0):
+    """
+    Record gesture samples in a BLOCKING way (to be run in a thread).
+    Returns the list of samples.
+    """
+    samples = []
+    dt = 1.0 / sample_rate_hz
+    num_samples = int(duration_s * sample_rate_hz)
+    
+    for i in range(num_samples):
+        sample = imu.read_sample()
+        samples.append(sample)
+        time.sleep(dt)
+    
+    return samples
+
+async def handle_vote(ws, imu, recognizer, name, loop):
     """
     Handles the voting using gesture recognition
     Flow: Press Enter to start -> Record gesture -> Confirm result
@@ -90,18 +106,17 @@ async def handle_vote(ws, imu, recognizer, name):
         print("\n[Pi] Ready to record gesture. Move the BerryIMU to vote (1-8)...")
         await async_input_helper.get_input("[Pi] Press Enter to start recording: ")
         
-        # Record gesture sequence (1 second)
+        # Record gesture sequence in a THREAD so it doesn't block the event loop
         print("[Pi] Recording gesture... move the BerryIMU now.")
-        samples = []
-        duration_s = 1.0
-        sample_rate_hz = 50.0
-        dt = 1.0 / sample_rate_hz
-        num_samples = int(duration_s * sample_rate_hz)
         
-        for i in range(num_samples):
-            sample = imu.read_sample()
-            samples.append(sample)
-            await asyncio.sleep(dt)  # Non-blocking sleep that allows event loop to run
+        # Run the blocking recording operation in a thread pool
+        samples = await loop.run_in_executor(
+            None,
+            record_gesture_blocking,
+            imu,
+            1.0,  # duration_s
+            50.0  # sample_rate_hz
+        )
         
         print("[Pi] Recording complete, recognizing...")
         
@@ -132,7 +147,7 @@ async def handle_vote(ws, imu, recognizer, name):
         await send_signal_to_server(ws, action, target, name)
         return True
 
-async def rpi_helper(ws, name, imu, recognizer):
+async def rpi_helper(ws, name, imu, recognizer, loop):
     print("[Pi] Are you running on your raspberry pi? (y for raspberry pi, n for local debugging): ", end='')
     cmd = await async_input_helper.get_input()
     cmd = cmd.strip().lower()
@@ -161,7 +176,7 @@ async def rpi_helper(ws, name, imu, recognizer):
             # Only handle voting when the server asks us to (vote, kill, save)
             if action in ["vote", "kill", "save"]:
                 if cmd == 'y':
-                    success = await handle_vote(ws, imu, recognizer, name)
+                    success = await handle_vote(ws, imu, recognizer, name, loop)
                     if not success:
                         print("[Pi] Vote failed, waiting for next server message...")
                 else:
@@ -202,7 +217,7 @@ async def rpi_handler(name):
         
         imu = BerryIMUInterface(debug=False)
         recognizer = GestureRecognizer()
-        await rpi_helper(ws, name, imu, recognizer)
+        await rpi_helper(ws, name, imu, recognizer, loop)
 
 if __name__ == "__main__":
     # Get player name from command line argument
