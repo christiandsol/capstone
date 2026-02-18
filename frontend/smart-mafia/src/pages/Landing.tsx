@@ -112,7 +112,7 @@ function Lobby({ onStart, playerName, setName }: LobbyProps) {
 }
 
 export default function App() {
-  const [page, setPage] = useState<"lobby" | "rpi">("lobby");
+  const [page, setPage] = useState<"lobby" | "GameRoom">("lobby");
   // const [players, setPlayers] = useState<string[]>([]);
   const [playerName, setName] = useState<string>("");
 
@@ -142,7 +142,7 @@ export default function App() {
         <Lobby
           onStart={() => {
             if (playerName !== "") {
-              setPage("rpi");
+              setPage("GameRoom");
             }
           }}
           players={["temp string"]}
@@ -151,7 +151,7 @@ export default function App() {
         />
       )}
 
-      {page === "rpi" && <GameRoom
+      {page === "GameRoom" && <GameRoom
         playerName={playerName}
       />}
     </div>
