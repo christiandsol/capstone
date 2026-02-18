@@ -1,5 +1,12 @@
 # Table of Contents
-
+1. [Introduction](#introduction)
+2. [System Requirements](#system-requirements)
+3. [Setup and Installation Instructions](#setup-and-installation-instructions)
+4. [User Interface Overview](#smart-mafia-user-interface-overview)
+5. [Specific Features](#specific-features)
+   - [Voice](#voice)
+   - [Gesture](#gesture)
+6. [Known Issues and Troubleshooting](#known-issues-and-troubleshooting)
 # Introduction
 
 # System Requirements
