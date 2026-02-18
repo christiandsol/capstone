@@ -13,6 +13,15 @@
 
 # Setup and Installation Instructions
 
+The frontend and server is already running and acessible at mafiacapstone.duckdns.org.
+
+## Raspberry Pi Setup
+
+To use the Raspberry Pi client for the Mafia game, you'll need to SSH into your Raspberry Pi and clone the repository. First, establish an SSH connection to your Raspberry Pi using your credentials (e.g., `ssh pi@YourPINAME.local`). Once connected, clone the `notify-restart` branch from the repository using the command `git clone -b notify-restart https://github.com/christiandsol/capstone.git capstone`. After cloning, navigate into the repository directory using `cd capstone`. 
+
+Before running the script, ensure you have Python 3.9 or higher installed (check with `python3 --version`). If you don't have `pip3` installed, install it using `sudo apt update && sudo apt install python3-pip`. Once pip3 is installed, install the required `websockets` library using `pip3 install websockets`. Make sure your BerryIMU hardware is properly connected to the Raspberry Pi via I2C(Should be done if you completed Lab1-3 last quarter). Once everything is set up, you can start the client by running `python3 rasbpi.py "player_Name"`, replacing `"player_Name"` with your actual player name (e.g., `python3 rasbpi.py "Jesus"`). The script will connect to the game server at `mafiacapstone.duckdns.org` and prompt you to choose between using the Raspberry Pi with gesture recognition (type 'y') or local debugging mode where you type numbers manually (type 'n'). When the server requests a vote during gameplay, follow the on-screen prompts to record your gesture or enter your vote.
+
+
 # Smart Mafia User Interface Overview
 
 
@@ -46,5 +55,18 @@ The Smart Mafia game supports the following voice commands:
 Say these commands clearly while the voice recognition is active. The system will listen for these phrases and automatically perform the corresponding game action.
 
 ## Gesture
+
+The Smart Mafia game supports gesture-based voting using the BerryIMU. Players can gesture for digits 1-8 with the BerryIMU to vote for specific players. The gesture directions are mapped as follows:
+
+- **Digit 1:** Right 
+- **Digit 2:** Down
+- **Digit 3:** Left
+- **Digit 4:** Up
+- **Digit 5:** Up-Right (diagonal)
+- **Digit 6:** Down-Right (diagonal)
+- **Digit 7:** Down-Left (diagonal)
+- **Digit 8:** Up-Right (diagonal)
+
+The `berryIMU/gesturetwo.py` file can be run independently to test gesture recognition and IMU functionality without connecting to the full game server. To use it, navigate to the repository directory cd berryIMU and check for file `gesturetwo.py`. Then run `python3 gesturetwo.py`. The script will start in interactive mode where you can press Enter to record a gesture, move the BerryIMU to signal a direction (1-8), and the system will recognize and optionally send a vote to the server. If the server is not running, the script will still recognize gestures and print what vote would have been sent, making it useful for testing gesture recognition independently. Slower movements will result in 1-4 while faster movements will result in diagonals. 
 
 # Known Issues and Troubleshooting
