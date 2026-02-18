@@ -7,6 +7,7 @@
    - [Voice](#voice)
    - [Gesture](#gesture)
 6. [Known Issues and Troubleshooting](#known-issues-and-troubleshooting)
+
 # Introduction
 
 This document will cover everything revolving Smart Mafia. This includes the system requirements needed to run it, the setup and install instructions to use the product, and an overview on the UI and specific features people need to know while playing the game. Finally, this document covers known issues and how to quickly troubleshoot them.
