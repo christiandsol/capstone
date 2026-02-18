@@ -9,7 +9,15 @@
 6. [Known Issues and Troubleshooting](#known-issues-and-troubleshooting)
 # Introduction
 
+This document will cover everything revolving Smart Mafia. This includes the system requirements needed to run it, the setup and install instructions to use the product, and an overview on the UI and specific features people need to know while playing the game. Finally, this document covers known issues and how to quickly troubleshoot them.
+
 # System Requirements
+## Software
+Ensure that you are running the application on: 
+- either Chrome or Safari browser, that is what was tested with
+- Ensure that your raspberry pi is running python3.7, check `which python`, if it's not 3.7, I chech `ls /usr/bin/python3.7` to see if it exists, if so, run that python
+## Raspberry pi
+- For more detail on setup and install, look at the next section
 
 # Setup and Installation Instructions
 
@@ -69,15 +77,10 @@ The Smart Mafia game supports gesture-based voting using the BerryIMU. Players c
 
 The `berryIMU/gesturetwo.py` file can be run independently to test gesture recognition and IMU functionality without connecting to the full game server. To use it, navigate to the repository directory cd berryIMU and check for file `gesturetwo.py`. Then run `python3 gesturetwo.py`. The script will start in interactive mode where you can press Enter to record a gesture, move the BerryIMU to signal a direction (1-8), and the system will recognize and optionally send a vote to the server. If the server is not running, the script will still recognize gestures and print what vote would have been sent, making it useful for testing gesture recognition independently. Slower movements will result in 1-4 while faster movements will result in diagonals. 
 
-# System Requirements
-## Software
-Ensure that you are running the application on: 
-- either Chrome or Safari browser, that is what was tested with
-- Ensure that your raspberry pi is running python3.7, check `which python`, if it's not 3.7, I chech `ls /usr/bin/python3.7` to see if it exists, if so, run that python
-## Raspberry pi
-- For more detail on setup and install, look at the next section
-
-
-## Setup and Install
-
 # Known Issues and Troubleshooting
+
+One small issue we ran into on one computer was sometimes the microphone not connecting immediately. This can be quickly fixed by switching the audio device being used by the website and then switching back to the original device you want.
+
+One other issue we had was not running the rasbpi script before starting the game. This would make it so that the player would be unable to perform any action during the game. Overall, this is a quick fix by disconnecting the player and reconnecting. Since this is at the beginning of the of the game, there should be no issue in restarting the game at this point.
+
+While disconnects for the most part have been fixed, if one were to disconnect, the game should end and all the players can refresh and reconnect.
