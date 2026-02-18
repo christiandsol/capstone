@@ -69,4 +69,15 @@ The Smart Mafia game supports gesture-based voting using the BerryIMU. Players c
 
 The `berryIMU/gesturetwo.py` file can be run independently to test gesture recognition and IMU functionality without connecting to the full game server. To use it, navigate to the repository directory cd berryIMU and check for file `gesturetwo.py`. Then run `python3 gesturetwo.py`. The script will start in interactive mode where you can press Enter to record a gesture, move the BerryIMU to signal a direction (1-8), and the system will recognize and optionally send a vote to the server. If the server is not running, the script will still recognize gestures and print what vote would have been sent, making it useful for testing gesture recognition independently. Slower movements will result in 1-4 while faster movements will result in diagonals. 
 
+# System Requirements
+## Software
+Ensure that you are running the application on: 
+- either Chrome or Safari browser, that is what was tested with
+- Ensure that your raspberry pi is running python3.7, check `which python`, if it's not 3.7, I chech `ls /usr/bin/python3.7` to see if it exists, if so, run that python
+## Raspberry pi
+- For more detail on setup and install, look at the next section
+
+
+## Setup and Install
+
 # Known Issues and Troubleshooting
