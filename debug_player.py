@@ -8,7 +8,7 @@ SERVER_PORT = 5050
 async def debug_player(player_name):
     uri = f"ws://{SERVER_IP}:{SERVER_PORT}"
     
-    async with websockets.connect(uri) as ws:
+    async with websockets.connect(uri, ping_interval = 20, ping_timeout = 20, close_timeout=10) as ws:
         # Send setup
         await ws.send(json.dumps({
             "action": "setup",
@@ -30,7 +30,7 @@ async def debug_player(player_name):
             vote = input(f"[{player_name}] Enter vote (1-4): ").strip()
             print(f'[DEBUG] Registered vote: {vote}')
             await ws.send(json.dumps({
-                "action": "targeted",
+                "action": "target",
                 "name": player_name,
                 "target": vote
             }))

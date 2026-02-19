@@ -147,7 +147,7 @@ class MafiaGame:
 
     def mafia_kill(self):
         if self.mafia_count == 1:
-            if self.mafia_name_one and self.players[self.mafia_name_one]["kill"]:
+            if self.players[self.mafia_name_one]["kill"] and self.players[self.mafia_name_one]["alive"]:
                 kill = self.players[self.mafia_name_one]["kill"]
                 self.players[self.mafia_name_one]["kill"] = None
                 return kill
@@ -163,7 +163,7 @@ class MafiaGame:
 
     def doctor_save(self):
         if self.doctor_count == 1:
-            if self.doctor_name_one and self.players[self.doctor_name_one]["save"]:
+            if self.players[self.doctor_name_one]["save"] and self.players[self.doctor_name_one]["alive"]:
                 save = self.players[self.doctor_name_one]["save"]
                 self.players[self.doctor_name_one]["save"] = None
                 return save
@@ -327,6 +327,7 @@ class MafiaGame:
             # Request mafia to make kill decision
             if self.mafia_count == 1:
                 await self.request_action(self.mafia_name_one, "kill")
+                return
             elif self.mafia_count == 2:
                 await asyncio.gather(
                     self.request_action(self.mafia_name_one, "kill"), 
@@ -337,11 +338,19 @@ class MafiaGame:
         if self.state == "MAFIAVOTE":
             # Check if mafia have made their kill choice
             kill = self.mafia_kill()
+            if kill == None and self.players[self.mafia_name_one]["kill"] and self.players[self.mafia_name_two]["kill"]:
+                self.players[self.mafia_name_one]["kill"] = None
+                self.players[self.mafia_name_two]["kill"] = None
+                await asyncio.gather(
+                    self.request_action(self.mafia_name_one, "kill"), 
+                    self.request_action(self.mafia_name_two, "kill")
+                )
+                return
             if kill:
                 print(f'[DEBUG] Mafia killed: {kill}')
                 self.last_killed = kill
                 # Only apply kill if no doctor or doctor is dead
-                if not (self.doctor_count >= 1 and self.players[self.doctor_name_one]["alive"]) and not (self.doctor_count == 2 and self.players[self.doctor_name_two]["alive"]):
+                if self.doctor_count == 0 or not self.players[self.doctor_name_one]["alive"]:
                     self.players[kill]["alive"] = False
                 await self.broadcast("mafia_kill", kill)
                 # Check if game is over after kill
@@ -353,7 +362,7 @@ class MafiaGame:
                     self.expected_signals = set()
                     await self.broadcast("game_over", {
                         "winner": winner,
-                        "mafia": [self.mafia_name_one, self.mafia_name_two] if self.mafia_count == 2 else [self.mafia_name_one]
+                        "mafia": [self.mafia_name_one, self.mafia_name_two] if len(list(self.players.keys())) >= 7 else [self.mafia_name_one]
                     })
                     await self.broadcast_restart_status()
                     return
@@ -366,40 +375,54 @@ class MafiaGame:
                 # Request doctor to make save decision
                 if self.doctor_count == 1:
                     await self.request_action(self.doctor_name_one, "save")
+                    return
                 elif self.doctor_count == 2:
                     await asyncio.gather(
                         self.request_action(self.doctor_name_one, "save"), 
                         self.request_action(self.doctor_name_two, "save")
                     )
+                    return
 
         # DOCTORVOTE STATE: Wait for doctor to decide who to save
         if self.state == "DOCTORVOTE":
             # Check if doctors have made their save choice
+            if self.doctor_count == 0:
+                self.state = "NARRATE"
             save = self.doctor_save()
+            if save == None and self.doctor_count == 2 and self.players[self.doctor_name_one]["save"] and self.players[self.doctor_name_two]["save"]:
+                self.players[self.doctor_name_one]["save"] = None
+                self.players[self.doctor_name_two]["save"] = None
+                await asyncio.gather(
+                    self.request_action(self.doctor_name_one, "save"), 
+                    self.request_action(self.doctor_name_two, "save")
+                )
             if save:
+                self.last_saved = save
                 print(f'[DEBUG] Doctor saved: {save}')
                 print(f'[DEBUG] Last attempted mafia kill: {self.last_killed}')
                 # Apply the kill if not saved
                 if self.last_killed != save:
                     self.players[self.last_killed]["alive"] = False
-                self.last_saved = save
-                self.players[save]["alive"] = True
-                self.state = "NARRATE"
+                    killed_name = self.last_killed
+                    # If mafia member was voted out, decrease mafia count
+                    if self.mafia_count == 2 and killed_name in [self.mafia_name_one, self.mafia_name_two]:
+                        self.mafia_count -= 1
+                        if killed_name == self.mafia_name_one:
+                            temp = self.mafia_name_one
+                            self.mafia_name_one = self.mafia_name_two
+                            self.mafia_name_two = temp
 
-                await self.broadcast("doctor_save", save);
+                    if self.doctor_count == 2 and killed_name in [self.doctor_name_one, self.doctor_name_two]:
+                        self.doctor_count -= 1
+                        if killed_name == self.doctor_name_one:
+                            self.doctor_name_one = self.doctor_name_two
+                        self.doctor_name_two = None
+                    elif self.doctor_count == 1 and killed_name in [self.doctor_name_one, self.doctor_name_two]:
+                        self.doctor_count -= 1
+                            
+                self.state = "NARRATE"
+                await self.broadcast("doctor_save", save)
                 # Check if game is over after doctor save
-                winner = self.check_game_over()
-                if winner:
-                    print("[DEBUG] GAME OVER after doctor save")
-                    self.game_winner = winner
-                    self.state = "GAMEOVER"
-                    self.expected_signals = set()
-                    await self.broadcast("game_over", {
-                        "winner": winner,
-                        "mafia": [self.mafia_name_one, self.mafia_name_two] if self.mafia_count == 2 else [self.mafia_name_one]
-                    })
-                    await self.broadcast_restart_status()
-                    return
 
         # NARRATE STATE: Announce night results and move to ready to vote
         if self.state == "NARRATE":
@@ -408,7 +431,8 @@ class MafiaGame:
                 "killed": self.last_killed,
                 "saved": self.last_saved
             })
-            
+            self.last_killed = None
+            self.last_saved = None
             # Check if game is over after night
             winner = self.check_game_over()
             if winner:
@@ -418,7 +442,7 @@ class MafiaGame:
                 self.expected_signals = set()
                 await self.broadcast("game_over", {
                     "winner": winner,
-                    "mafia": [self.mafia_name_one, self.mafia_name_two] if self.mafia_count == 2 else [self.mafia_name_one]
+                    "mafia": [self.mafia_name_one, self.mafia_name_two] if len(list(self.players.keys())) >= 7 else [self.mafia_name_one]
                 })
                 await self.broadcast_restart_status()
                 return
@@ -455,8 +479,19 @@ class MafiaGame:
             if self.mafia_count == 2 and voted_out_name in [self.mafia_name_one, self.mafia_name_two]:
                 self.mafia_count -= 1
                 if voted_out_name == self.mafia_name_one:
+                    temp = self.mafia_name_one
                     self.mafia_name_one = self.mafia_name_two
-            
+                    self.mafia_name_two = temp
+
+            if self.doctor_count == 2 and voted_out_name in [self.doctor_name_one, self.doctor_name_two]:
+                self.doctor_count -= 1
+                if voted_out_name == self.doctor_name_one:
+                    self.doctor_name_one = self.doctor_name_two
+                self.doctor_name_two = None
+            elif self.doctor_count == 1 and voted_out_name in [self.doctor_name_one, self.doctor_name_two]:
+                self.doctor_count -= 1
+
+
             self.players[voted_out_name]["alive"] = False
             await self.broadcast("vote_result", voted_out_name)
             
@@ -469,7 +504,7 @@ class MafiaGame:
                 self.expected_signals = set()
                 await self.broadcast("game_over", {
                     "winner": winner,
-                    "mafia": [self.mafia_name_one, self.mafia_name_two] if self.mafia_count == 2 else [self.mafia_name_one]
+                    "mafia": [self.mafia_name_one, self.mafia_name_two] if len(list(self.players.keys())) >= 7 else [self.mafia_name_one]
                 })
                 await self.broadcast_restart_status()
                 return
