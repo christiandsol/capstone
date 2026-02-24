@@ -56,7 +56,8 @@ Before running the script, ensure you have Python 3.9 or higher installed (check
 
 ## Raspberry Pi gesture tutorial
 
-I've attached a video for the exact positionings for the gestures in accordance to the player ID you want to vote for below, notice that these gestures are subtle, it might take a couple practice runs. For us it works when you move slowly over 3 seconds and move it less than 10degrees.
-![1-4 Display](https://youtube.com/shorts/PR1H1accfI0?feature=share)
+I've attached a video for the exact positionings for the gestures in accordance to the player ID you want to vote for below, notice that these gestures are subtle, it might take a couple practice runs. For us it works when you move slowly over 3 seconds and move it less than 10 degrees.
+
+[![1-4 Display](https://img.youtube.com/vi/PR1H1accfI0/0.jpg)](https://youtube.com/shorts/PR1H1accfI0)
 
 
