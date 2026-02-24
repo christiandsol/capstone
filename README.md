@@ -46,10 +46,17 @@ Before joining our website, look up on your google chrome search bar `chrome://f
 
 ## Using the platform
 
-Now you can go ahead and visit [our website]http://163.192.0.247 and start a game! // Should be deleted or updated to new website
+Now you can go ahead and visit [mafiacapstone]https://mafiacapstone.duckdns.org and start a game!
 
 ## Raspberry Pi Setup
 
 To use the Raspberry Pi client for the Mafia game, you'll need to SSH into your Raspberry Pi and clone the repository. First, establish an SSH connection to your Raspberry Pi using your credentials (e.g., `ssh pi@YourPINAME.local`). Once connected, clone the `notify-restart` branch from the repository using the command `git clone -b notify-restart https://github.com/christiandsol/capstone.git capstone`. After cloning, navigate into the repository directory using `cd capstone`. 
 
 Before running the script, ensure you have Python 3.9 or higher installed (check with `python3 --version`). If you don't have `pip3` installed, install it using `sudo apt update && sudo apt install python3-pip`. Once pip3 is installed, install the required `websockets` library using `pip3 install websockets`. Make sure your BerryIMU hardware is properly connected to the Raspberry Pi via I2C(Should be done if you completed Lab1-3 last quarter). Once everything is set up, you can start the client by running `python3 rasbpi.py "player_Name"`, replacing `"player_Name"` with your actual player name (e.g., `python3 rasbpi.py "Jesus"`). The script will connect to the game server at `mafiacapstone.duckdns.org` and prompt you to choose between using the Raspberry Pi with gesture recognition (type 'y') or local debugging mode where you type numbers manually (type 'n'). When the server requests a vote during gameplay, follow the on-screen prompts to record your gesture or enter your vote.
+
+## Raspberry Pi gesture tutorial
+
+I've attached a video for the exact positionings for the gestures in accordance to the player ID you want to vote for below, notice that these gestures are subtle, it might take a couple practice runs. For us it works when you move slowly over 3 seconds and move it less than 10degrees.
+[![1-4 Display](https://www.youtube.com/watch?v=PR1H1accfI0)
+
+
