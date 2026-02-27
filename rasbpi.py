@@ -91,8 +91,7 @@ async def handle_vote(ws, imu, recognizer, name):
         return True
 
 async def rpi_helper(ws, name, imu, recognizer):
-    cmd = input("[Pi] Are you running on your raspberry pi? (y for raspberry pi, n for local debugging): ")
-    cmd = cmd.strip().lower()
+    global cmd
 
     try:
         async for message in ws:
@@ -148,12 +147,29 @@ async def rpi_handler(name):
         }
         await ws.send(json.dumps(setup_msg))
         print(f"[DEBUG] Sent setup message with name: {name}")
+        print(f"[DEBUG] Now waiting for message from server to request an action...")
 
         imu = BerryIMUInterface(debug=False)
         recognizer = GestureRecognizer()
         await rpi_helper(ws, name, imu, recognizer)
 
 if __name__ == "__main__":
-    player_name = sys.argv[1] if len(sys.argv) > 1 else "RaspberryPiPlayer"
+    if len(sys.argv) <= 1:
+        print("[HELP] Script is ran as: `python rasbpi.py <player_name> [OPTIONAL]: -n`")
+        print("\t[HELP] -n specifies you aren't using your raspberry pi gesture recognition")
+        exit()
+    player_name = sys.argv[1]
+    if len(sys.argv) > 2:
+        global cmd
+        if sys.argv[2] == '-n':
+            print(f"[DEBUG] Continuing without raspberry pi IMU")
+            cmd = 'n'
+        else:
+            print(f"[DEBUG] Unknown arguments, continuing using raspberry pi IMU")
+            cmd = 'y'
+    else:
+        print(f"[DEBUG] Continuing with raspberry pi IMU")
+
+        
     print(f"[DEBUG] Starting with player name: {player_name}")
     asyncio.run(rpi_handler(player_name))

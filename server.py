@@ -80,12 +80,14 @@ async def handler(ws: WebSocketServerProtocol):
 
                 # Web client joining
                 player_name = incoming_name
-                if player_name in game.players or game.game_started:
-                    reason = (
-                        f"Name '{player_name}' is already taken"
-                        if player_name in game.players
-                        else "Game has already started — wait for the next game"
-                    )
+                if player_name in game.players or game.game_started or player_name not in game.rpis:
+                    reason = ""
+                    if player_name in game.players:
+                        reason = f"Name '{player_name}' is already taken"
+                    elif game.game_started:
+                        reason = "Game has already started — wait for the next game"
+                    elif player_name not in game.rpis:
+                        reason = f"Raspberry pi with name {player_name} doesn't exist, you must connect with raspberry pi first before here"
                     print(f"[DEBUG] Join denied for '{player_name}': {reason}")
                     await send_json(ws, player_name, "denyJoin", reason)
                     player_name = None

@@ -1,7 +1,8 @@
 
 # TODO
-- [ ] Fix lobby functionality for people randomly joining
-- [ ] Add "Assign players" functionality
-- [ ] allow player to join at any time
-
+- [x] Don't need to press yes or not in raspbery pi, calli t as an argument instead
+    - defaults to using it
+    - some flag
+- [x] Make rpi waiting + debugging better
+- [x] Can't join if you haven't started raspberry pi already
 
