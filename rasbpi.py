@@ -11,8 +11,9 @@ from gesturetwo import BerryIMUInterface, GestureRecognizer
 
 # SERVER_IP = "mafiacapstone.duckdns.org"
 SERVER_IP = "127.0.0.1"
-
-SERVER_PORT = 5050
+GAME_SERVER_PORT = 5050
+WEB_SERVER_PORT = 3001
+HTTP_PROTO = "http"
 
 def parse_json(message: Data):
     try:
@@ -55,6 +56,20 @@ def record_gesture_blocking(imu, duration_s: float = 1.0, sample_rate_hz: float 
         time.sleep(dt)
 
     return samples
+
+async def notify_web_server_disconnect(name: str):
+    import aiohttp
+    web_url = f"{HTTP_PROTO}://{SERVER_IP}:{WEB_SERVER_PORT}"
+    try:
+        async with aiohttp.ClientSession() as session:
+            await session.post(
+                f"{web_url}/disconnect-player",
+                json={"name": name}
+            )
+        print(f"[DEBUG] Notified web server to disconnect {name}")
+    except Exception as e:
+        print(f"[DEBUG] Failed to notify web server: {e}")
+
 
 async def handle_vote(ws, imu, recognizer, name):
     """
@@ -101,6 +116,10 @@ async def rpi_helper(ws, name, imu, recognizer):
             print(f"[DEBUG]: {msg}")
             action = msg.get("action")
 
+            if action == "denyJoin":
+                pi_reason = msg.get("target")
+                print(f"[DEBUG]: Unable to join: {pi_reason}")
+                return
             if action in ["civilian", "mafia", "doctor"]:
                 print(f"[DEBUG] received role: {action}")
                 continue
@@ -129,29 +148,36 @@ async def rpi_helper(ws, name, imu, recognizer):
         print(f"[ERROR] Handler error for {name}: {e}")
         import traceback
         traceback.print_exc()
-    finally:
-        print("[DEBUG] Player leaving...")
+
+
+
 
 async def rpi_handler(name):
     # uri = f"wss://{SERVER_IP}/ws"
-    uri = f"ws://{SERVER_IP}:{SERVER_PORT}"
+    uri = f"ws://{SERVER_IP}:{GAME_SERVER_PORT}"
     
     print(f"[DEBUG] Connecting to {uri}")
 
-    async with websockets.connect(uri, open_timeout=10, close_timeout=10, ping_interval=20, ping_timeout=20) as ws:
-        print('[DEBUG] Connected to server')
-        setup_msg = {
-            "action": "setup",
-            "name": name,
-            "target": "rpi"
-        }
-        await ws.send(json.dumps(setup_msg))
-        print(f"[DEBUG] Sent setup message with name: {name}")
-        print(f"[DEBUG] Now waiting for message from server to request an action...")
 
-        imu = BerryIMUInterface(debug=False)
-        recognizer = GestureRecognizer()
-        await rpi_helper(ws, name, imu, recognizer)
+    try:
+        async with websockets.connect(uri, open_timeout=10, close_timeout=10, ping_interval=20, ping_timeout=20) as ws:
+            print('[DEBUG] Connected to server')
+            setup_msg = {
+                "action": "setup",
+                "name": name,
+                "target": "rpi"
+            }
+            await ws.send(json.dumps(setup_msg))
+            print(f"[DEBUG] Sent setup message with name: {name}")
+            print(f"[DEBUG] Now waiting for message from server to request an action...")
+
+            imu = BerryIMUInterface(debug=False)
+            recognizer = GestureRecognizer()
+            await rpi_helper(ws, name, imu, recognizer)
+    except KeyboardInterrupt:
+        print("[DEBUG] Ctrl+C detected, disconneting cleanly...")
+    finally: 
+        await notify_web_server_disconnect(name)
 
 if __name__ == "__main__":
     if len(sys.argv) <= 1:

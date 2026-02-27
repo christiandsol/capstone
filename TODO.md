@@ -1,8 +1,5 @@
 
 # TODO
-- [x] Don't need to press yes or not in raspbery pi, calli t as an argument instead
-    - defaults to using it
-    - some flag
-- [x] Make rpi waiting + debugging better
-- [x] Can't join if you haven't started raspberry pi already
-
+- [x] Changing player page on raspi disconnect
+- [x] Weird bug where player is already in game
+- [x] Check name for raspberry pi as well (no duplicate rpi connections)

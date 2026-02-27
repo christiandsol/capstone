@@ -17,6 +17,9 @@ type GameProps = {
   gameSocket: UseGameSocketReturn;
   setStatus: (status: string) => void;
   status: string;
+  onSuccess: () => void,
+  onDeny: () => void,
+  onWebDisconnect: () => void,
 };
 
 const winnerText: Record<string, string> = {
@@ -25,7 +28,7 @@ const winnerText: Record<string, string> = {
   no_one: "NO ONE WON",
 };
 
-export default function GameRoom({ playerName, gameSocket, setStatus, status }: GameProps) {
+export default function GameRoom({ playerName, gameSocket, setStatus, status, onWebDisconnect }: GameProps) {
   const [headPosition, setHeadPosition] = useState("unknown");
   const [isStarted, setIsStarted] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -40,6 +43,7 @@ export default function GameRoom({ playerName, gameSocket, setStatus, status }: 
     role,
     playerId,
     lobbyStatus,
+    setLobbyStatus,
     restartStatus,
     gameOverData,
     deadPlayers,
@@ -74,7 +78,30 @@ export default function GameRoom({ playerName, gameSocket, setStatus, status }: 
   );
 
   // WebRTC peer connections
-  const { remoteStreams } = useWebRTC(localStream, setStatus, playerName, playerId);
+  const { remoteStreams } = useWebRTC(
+    localStream,
+    setStatus,
+    playerName,
+    playerId,
+    (disconnectedName) => {
+      // Optimistically remove from lobby status display
+      if (disconnectedName === '__self__') {
+        // if you are the player to disconnect, go back to Lobby page
+        onWebDisconnect();
+      }
+      if (lobbyStatus) {
+        const updatedPlayers = { ...lobbyStatus.players };
+        delete updatedPlayers[disconnectedName];
+        setLobbyStatus({
+          ...lobbyStatus,
+          total_count: lobbyStatus.total_count - 1,
+          ready_count: updatedPlayers[disconnectedName] ? lobbyStatus.ready_count - 1 : lobbyStatus.ready_count,
+          players: updatedPlayers
+        });
+      }
+
+    }
+  );
 
   // Toggle audio mute/unmute
   const toggleAudio = () => {

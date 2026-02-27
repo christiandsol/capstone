@@ -307,6 +307,7 @@ export const useGameSocket = (
         return () => {
             console.log('[Game] Cleaning up connection');
             isCurrentConnection = false;
+            hasSetupRef.current = false
 
             if (reconnectTimeoutRef.current) {
                 clearTimeout(reconnectTimeoutRef.current);
@@ -363,6 +364,7 @@ export const useGameSocket = (
         role,
         playerId,
         lobbyStatus,
+        setLobbyStatus,
         restartStatus,
         gameOverData,
         deadPlayers,

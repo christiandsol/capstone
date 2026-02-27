@@ -25,10 +25,12 @@ const io = new Server(server, {
 io.on("connection", socket => {
   console.log("Connected:", socket.id);
 
-  socket.on("join-room", room => {
+  socket.on("join-room", (room, playerName: string) => {
     socket.join(room);
+    if (playerName) {
+      (socket as any).playerName = playerName;
+    }
     socket.to(room).emit("user-joined", socket.id);
-    console.log(`Socket ${socket.id} joined room: ${room}`);
   });
 
   socket.on("broadcast-player-info", (data: { name: string; id: number }) => {
@@ -60,19 +62,77 @@ io.on("connection", socket => {
 
   socket.on("disconnecting", () => {
     console.log("Disconnected:", socket.id);
-    console.log("Broadcasting disconnect now")
-
-    // Notify all rooms that this user has left
+    console.log("Broadcasting disconnect now");
     socket.rooms.forEach(room => {
-      if (room !== socket.id) { // Don't emit to the socket's own room
-        socket.to(room).emit("user-disconnected", socket.id);
+      if (room !== socket.id) {
+        io.in(room).emit("user-disconnected", {  // io.in includes the sender
+          socketId: socket.id,
+          playerName: (socket as any).playerName
+        });
         console.log(`[Server] Notified room ${room} that ${socket.id} left`);
       }
     });
+
+    socket.emit("user-disconnected", {
+      socketId: socket.id,
+      playerName: (socket as any).playerName
+    });
   });
+});
+
+app.post("/disconnect-player", (req, res) => {
+  const { name } = req.body;
+  console.log(`[POST] /disconnect-player received disconnect signal for: ${name}`)
+
+  if (!name) {
+    res.status(400).json({ error: "Missing player name" });
+    return;
+  }
+
+  // Find the socket for this player name and disconnect it
+  let found = false;
+  io.sockets.sockets.forEach(socket => {
+    if ((socket as any).playerName === name) {
+      socket.disconnect(true);
+      found = true;
+    }
+  });
+
+  if (found) {
+    res.json({ success: true, message: `Disconnected ${name}` });
+  } else {
+    res.status(404).json({ error: `Player ${name} not found` });
+  }
 });
 
 // Listen on :: (IPv6) which also accepts IPv4 connections
 server.listen(3001, "::", () => {
   console.log("Signaling server on 3001 (IPv4 and IPv6)");
+});
+
+process.on('SIGINT', async () => {
+  console.log('[Server] Shutting down...');
+
+  // 1. First broadcast disconnect to everyone BEFORE closing anything
+  io.sockets.sockets.forEach(socket => {
+    const playerName = (socket as any).playerName;
+    if (playerName) {
+      socket.rooms.forEach(room => {
+        if (room !== socket.id) {
+          socket.to(room).emit("user-disconnected", {
+            socketId: socket.id,
+            playerName: playerName
+          });
+        }
+      });
+    }
+  });
+
+  // 2. Give it a moment to flush before shutting down
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  // 3. NOW close everything
+  io.close();
+  server.close();
+  process.exit(0);
 });

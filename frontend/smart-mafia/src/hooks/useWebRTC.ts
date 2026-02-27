@@ -17,7 +17,9 @@ export const useWebRTC = (
     localStream: MediaStream | null,
     onStatusChange: (status: string) => void,
     playerName: string,
-    playerId: number | null
+    playerId: number | null,
+    onPlayerDisconnected?: (playerName: string) => void,
+
 ): UseWebRTCReturn => {
     const socketRef = useRef<Socket | null>(null);
     const peerRefs = useRef<{ [key: string]: RTCPeerConnection }>({});
@@ -40,7 +42,7 @@ export const useWebRTC = (
         socketRef.current.on('connect', () => {
             mySocketIdRef.current = socketRef.current?.id || null;
             console.log('[WebRTC] Connected to signaling server, my socket ID:', mySocketIdRef.current);
-            socketRef.current?.emit('join-room', 'test-room');
+            socketRef.current?.emit('join-room', 'test-room', playerName);
             onStatusChange('Connected to video server!');
         });
 
@@ -264,12 +266,20 @@ export const useWebRTC = (
         });
 
         // Listen for user disconnect
-        socketRef.current.on('user-disconnected', (socketId: string) => {
-            console.log(`[Disconnect] User disconnected: ${socketId}`);
+        socketRef.current.on('user-disconnected', ({ socketId, playerName: disconnectedName }: { socketId: string, playerName?: string }) => {
+            console.log(`[Disconnect] User disconnected: ${socketId} (${disconnectedName})`);
             removeRemoteStreamsForSocketId(socketId);
             closePeerConnection(socketId);
+            if (disconnectedName) {
+                onPlayerDisconnected?.(disconnectedName);
+                removeRemoteStreamsForSocketId(socketId);
+            }
         });
 
+        socketRef.current.on('disconnect', () => {
+            console.log('[WebRTC] Lost connection to signaling server');
+            onPlayerDisconnected?.('__self__');
+        });
         // Listen for signals
         socketRef.current.on('signal', async ({ from, data }: { from: string; data: any }) => {
             console.log(`[Signal] Received signal from ${from}, type: ${data.type || 'ice-candidate'}`);

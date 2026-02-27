@@ -31,6 +31,7 @@ export interface UseGameSocketReturn {
     role: string | null;
     playerId: number | null;
     lobbyStatus: LobbyStatus | null;
+    setLobbyStatus: (status: LobbyStatus | null) => void;
     restartStatus: RestartStatus | null;
     gameOverData: GameOverData | null;
     deadPlayers: Set<string>;

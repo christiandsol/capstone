@@ -161,7 +161,12 @@ export default function App() {
       )}
 
       {page === "GameRoom" && <GameRoom
-        playerName={playerName} gameSocket={gameSocket} setStatus={setStatus} status={status}
+        playerName={playerName} gameSocket={gameSocket} setStatus={setStatus} status={status} onWebDisconnect={
+          () => {
+            setPage("lobby");
+            setShouldConnect(false);
+          }
+        }
       />}
     </div>
   );

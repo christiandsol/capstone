@@ -6,12 +6,22 @@ from websockets.legacy.server import WebSocketServerProtocol
 from util import send_json, parse_json
 from MafiaGame import MafiaGame
 
+
+# ---------------------------------------------------------------------------
+# CONSTANTS
+# ---------------------------------------------------------------------------
+
 HOST = "0.0.0.0"
 PORT = 5050
 
 # Voice command codes
 VOICE_COMMAND_READY_ASSIGN = 2  # "assign players" → mark ready during LOBBY
 VOICE_COMMAND_READY_VOTE = 3    # "ready to vote"  → mark ready during READYTOVOTE
+RPI_TYPE= "rpi"
+PLAYER_TYPE= "player"
+
+DENY = "denyJoin"
+ACCEPT = "acceptJoin"
 
 
 
@@ -21,6 +31,40 @@ VOICE_COMMAND_READY_VOTE = 3    # "ready to vote"  → mark ready during READYTO
 
 lock = asyncio.Lock()
 game: MafiaGame = MafiaGame()
+
+# ---------------------------------------------------------------------------
+# Helper functions
+# ---------------------------------------------------------------------------
+
+
+def check_join(playerName: str, t: str) -> (str, str):
+    """
+    @param t: type [RPI_TYPE, PLAYER_TYPE]
+    Depending on type, checks if player can join
+    """
+    in_game = None
+    joined_rpi = None
+    if t == RPI_TYPE:
+        in_game = playerName in game.rpis
+        joined_rpi = True 
+    elif t == PLAYER_TYPE:
+        in_game = playerName in game.players
+        joined_rpi = playerName in game.rpis
+
+    reason = ""
+    joinMsg = ""
+    if in_game or game.game_started or not joined_rpi:
+        joinMsg = DENY
+        if in_game:
+            reason = f"Raspberry pi with name: '{playerName}' is already taken"
+        elif game.game_started:
+            reason = "Game has already started — wait for the next game"
+        elif not joined_rpi:
+            reason = f"Raspberry pi with name {playerName} doesn't exist, you must connect with raspberry pi first before here"
+    else: 
+        joinMsg = ACCEPT
+    return reason, joinMsg
+
 
 
 # ---------------------------------------------------------------------------
@@ -73,6 +117,13 @@ async def handler(ws: WebSocketServerProtocol):
                 # RPi registration
                 if incoming_name == "rpi":
                     rpi_player_name = msg.get("name")
+                    pi_reason, pi_joinMsg = check_join(playerName=rpi_player_name, t=RPI_TYPE)
+                    if pi_joinMsg== DENY:
+                        print(f"[DEBUG] Join denied for '{rpi_player_name}'s raspberry pi: {pi_reason}")
+                        await send_json(ws, rpi_player_name, DENY, pi_reason)
+                        player_name = None
+                        await ws.close(1008, "Join denied")
+                        continue
                     print(f"[DEBUG] RPi registered for player: {rpi_player_name}")
                     game.rpis[rpi_player_name] = ws
                     player_name = rpi_player_name
@@ -80,16 +131,10 @@ async def handler(ws: WebSocketServerProtocol):
 
                 # Web client joining
                 player_name = incoming_name
-                if player_name in game.players or game.game_started or player_name not in game.rpis:
-                    reason = ""
-                    if player_name in game.players:
-                        reason = f"Name '{player_name}' is already taken"
-                    elif game.game_started:
-                        reason = "Game has already started — wait for the next game"
-                    elif player_name not in game.rpis:
-                        reason = f"Raspberry pi with name {player_name} doesn't exist, you must connect with raspberry pi first before here"
+                reason, joinMsg = check_join(playerName=player_name, t=PLAYER_TYPE)
+                if joinMsg == DENY:
                     print(f"[DEBUG] Join denied for '{player_name}': {reason}")
-                    await send_json(ws, player_name, "denyJoin", reason)
+                    await send_json(ws, player_name, DENY, reason)
                     player_name = None
                     await ws.close(1008, "Join denied")
                     continue
@@ -117,7 +162,7 @@ async def handler(ws: WebSocketServerProtocol):
                         "alive": True,
                     }
 
-                await send_json(ws, player_name, "acceptJoin", None)
+                await send_json(ws, player_name, joinMsg, None)
                 await send_json(ws, player_id, "id_registered", None)
                 print(f"[DEBUG] {player_name} joined (ID {player_id})")
                 await game.broadcast_lobby_status()
@@ -210,20 +255,27 @@ async def clean_player(player_name: str, ws: WebSocketServerProtocol):
 
     # Notify and disconnect the player's RPi if one is registered
     if player_name in game.rpis:
+        print(f"[DEBUG] Cleaning up {player_name}'s Raspberry pi")
         rpi_ws = game.rpis[player_name]
-        await send_json(rpi_ws, player_name, "disconnect", None)
+        try: 
+            await send_json(rpi_ws, player_name, "disconnect", None)
+        except Exception:
+            pass
         del game.rpis[player_name]
 
     # Remove from web-client tracking
     if ws in game.clients:
+        print(f"[DEBUG] Cleaning up {player_name}'s WebSocket Connection")
         del game.clients[ws]
 
     # Remove from player registry and ID maps
     if player_name in game.players:
         player_id = game.name_to_player_id.get(player_name)
         if player_id is not None:
-            del game.player_id_to_name[player_id]
-            del game.name_to_player_id[player_name]
+            if player_id in game.player_id_to_name:  # add this check
+                del game.player_id_to_name[player_id]
+            if player_name in game.name_to_player_id:  # add this check
+                del game.name_to_player_id[player_name]
         del game.players[player_name]
 
     print(f"[DEBUG] {player_name} removed")
