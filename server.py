@@ -282,7 +282,7 @@ async def clean_player(player_name: str, ws: WebSocketServerProtocol):
 
     if len(game.players) < 3:
         game.game_started = False
-
+    #
     # If no game was in progress, just refresh the lobby for remaining players
     if game.state == "LOBBY":
         await game.broadcast_lobby_status()
@@ -291,6 +291,15 @@ async def clean_player(player_name: str, ws: WebSocketServerProtocol):
     # Mid-game disconnect — reset everything and send everyone back to lobby
     print(f"[DEBUG] {player_name} left mid-game — resetting to lobby")
     game.reset_game_state()
+
+    for i, name in enumerate(game.players.keys(), start=1):
+        game.player_id_to_name[i] = name
+        game.name_to_player_id[name] = i
+        # Notify each client of their new ID
+        client_ws = next((ws for ws, n in game.clients.items() if n == name), None)
+        if client_ws:
+            await send_json(client_ws, i, "id_registered", None)
+
     await game.broadcast("lobby_reset", player_name)
     await game.broadcast_lobby_status()
 

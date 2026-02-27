@@ -301,6 +301,10 @@ class MafiaGame:
             player_data["save"] = None
             player_data["alive"] = True
 
+        self.player_id_to_name = {}
+        self.name_to_player_id = {}
+
+
         self.mafia_name_one = None
         self.mafia_name_two = None
         self.doctor_name_one = None
