@@ -12,7 +12,7 @@ CHIN = 152
 FOREHEAD = 10
 
 
-async def send_json(ws: WebSocketServerProtocol, playerName: Union[str, int], action: str, target): ## new sendjson
+async def send_json(ws: WebSocketServerProtocol, playerName: Union[str, int, None], action: str, target): ## new sendjson
     data = {
         "player": playerName,
         "action": action,

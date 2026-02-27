@@ -10,9 +10,13 @@ import { VoiceControls } from '../components/VoiceControls';
 import { VideoControls } from '../components/VideoControls';
 import { RemoteVideo } from '../components/RemoteVideo';
 import { Notification } from '../components/Notifications';
+import type { UseGameSocketReturn } from '../types/game.types';
 
 type GameProps = {
   playerName: string;
+  gameSocket: UseGameSocketReturn;
+  setStatus: (status: string) => void;
+  status: string;
 };
 
 const winnerText: Record<string, string> = {
@@ -21,8 +25,7 @@ const winnerText: Record<string, string> = {
   no_one: "NO ONE WON",
 };
 
-export default function GameRoom({ playerName }: GameProps) {
-  const [status, setStatus] = useState("Click 'Start' to begin");
+export default function GameRoom({ playerName, gameSocket, setStatus, status }: GameProps) {
   const [headPosition, setHeadPosition] = useState("unknown");
   const [isStarted, setIsStarted] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -45,7 +48,7 @@ export default function GameRoom({ playerName }: GameProps) {
     sendVoiceCommand,
     sendReady,
     sendRestart
-  } = useGameSocket(setStatus, playerName, notify.error);
+  } = gameSocket;
 
   // Voice recognition
   const { isListening, start: startVoice, stop: stopVoice } = useVoiceRecognition(
@@ -122,17 +125,6 @@ export default function GameRoom({ playerName }: GameProps) {
 
   return (
     <div style={{ padding: "0", fontFamily: "system-ui, sans-serif", background: "#1a1a1a", minHeight: "100vh", color: "white" }}>
-      {/* Render all notifications */}
-      {notifications.map((notification) => (
-        <Notification
-          key={notification.id}
-          id={notification.id}
-          message={notification.message}
-          type={notification.type}
-          duration={notification.duration}
-          onDismiss={removeNotification}
-        />
-      ))}
 
       {/* Game Room Heading */}
       <div style={{

@@ -1,6 +1,6 @@
 import asyncio
 import random
-from typing import Dict, List
+from typing import Dict, List, Optional
 import websockets
 from websockets.legacy.server import WebSocketServerProtocol
 from util import send_json, parse_json
@@ -13,18 +13,22 @@ MAX_PLAYERS = 8
 VOICE_COMMAND_READY_ASSIGN = 2  # "assign players" during LOBBY
 VOICE_COMMAND_READY_VOTE = 3    # "ready to vote" during READYTOVOTE phase
 
+DELETE = "delete"
+DENY = "deny"
+
+
 class MafiaGame:
     def __init__(self):
         self.state = "LOBBY"
         self.expected_signals = {"setup"}
         self.max_players = MAX_PLAYERS
 
-        self.players: Dict[str, dict] = {}  # name -> player data
-        self.clients: Dict[WebSocketServerProtocol, str] = {}  # ws -> name
-        self.rpis: Dict[WebSocketServerProtocol, str] = {} # name --> ws
+        self.players: Dict[Optional[str], dict] = {}  # name -> player data
+        self.clients: Dict[WebSocketServerProtocol, Optional[str]] = {}  # ws -> name
+        self.rpis: Dict[WebSocketServerProtocol, Optional[str]] = {} # name --> ws
         
-        self.player_id_to_name: Dict[int, str] = {}  # player_id -> name
-        self.name_to_player_id: Dict[str, int] = {}  # name -> player_id
+        self.player_id_to_name: Dict[int, Optional[str]] = {}  # player_id -> name
+        self.name_to_player_id: Dict[Optional[str], int] = {}  # name -> player_id
         
         self.mafia_name_one = None
         self.mafia_name_two = None
@@ -36,6 +40,7 @@ class MafiaGame:
         self.mafia_count = None
         self.doctor_count = None
         self.game_winner = None
+        self.game_started = False
 
     def valid_signal(self, signal):
         return signal and signal.get("action") in self.expected_signals
@@ -309,6 +314,7 @@ class MafiaGame:
             print(f"[DEBUG] Assigned roles: Mafia={self.mafia_count}, Doctor={self.doctor_count}")
             self.state = "ASSIGN"
             self.expected_signals = set()
+            self.game_started = True
 
         # ASSIGN STATE: Send role assignments to all players
         if self.state == "ASSIGN":
@@ -523,6 +529,8 @@ class MafiaGame:
             await self.broadcast("heads_down", voted_out_name)
         
         # GAMEOVER STATE: Wait for all players to vote for restart
+        if self.state == "GAMEOVER":
+            self.game_started = False
         if self.state == "GAMEOVER" and self.check_everyone_wants_restart():
             print("[DEBUG] All players want to restart! Restarting game...")
             self.reset_game_state()
@@ -538,6 +546,7 @@ game: MafiaGame = MafiaGame()
 
 async def handler(ws: WebSocketServerProtocol):
     player_name: str | None = None
+    # initial connection
 
     try:
         async for msg_text in ws:
@@ -574,12 +583,29 @@ async def handler(ws: WebSocketServerProtocol):
             
             # Handle setup message
             if msg.get("action") == "setup":
-                player_name = msg.get("target")
+                player_name: Optional[str] = msg.get("target")
                 if player_name == "rpi":
                     player_name = msg.get("name")
                     print(f"[DEBUG] server adding rpi: {player_name}")
                     game.rpis[player_name] = ws
                     continue
+                else: 
+                    join_msg = ""
+                    reason = ""
+                    if player_name in game.players or game.game_started:
+                        if player_name in game.players:
+                            reason = f"Player with name {player_name} already registered"
+                        elif game.game_started: 
+                            reason = f"Game has already started, you must wait for the next game"
+                        join_msg = "denyJoin"
+                    else:
+                        join_msg = "acceptJoin"
+                    await send_json(ws, player_name, join_msg, reason)
+                    if join_msg == "denyJoin":
+                        player_name = None
+                        await ws.close(1008, "Join denied")
+                        continue
+
                 
                 print(f"[DEBUG] server adding player: {player_name}")
                 
@@ -699,7 +725,6 @@ async def handler(ws: WebSocketServerProtocol):
             print(f"[DEBUG] Player {player_name} removed from game")
 
 async def clean_player(player_name: str, ws: WebSocketServerProtocol):
-        print("[DEBUG] attempting to gracefully resolve game logic")
         if player_name:
             print(f"[DEBUG]: player_name: {player_name}")
             game.players[player_name]["alive"] = False
@@ -723,6 +748,7 @@ async def clean_player(player_name: str, ws: WebSocketServerProtocol):
 
         print("[DEBUG] Game now over because player left, restarting")
         game.state = "GAMEOVER"
+        game.game_started = False
         await game.broadcast("game_over", {
             "winner": "no_one",
             "mafia": [game.mafia_name_one, game.mafia_name_two] if game.mafia_count == 2 else [game.mafia_name_one]

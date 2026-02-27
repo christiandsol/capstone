@@ -2,6 +2,10 @@ import { useState } from "react";
 
 import Rpi from "./Rpi";
 import GameRoom from "./GameRoom";
+import { useGameSocket } from "../hooks/useGameSocket";
+import { useNotifications } from "../hooks/useNotifications";
+import type { UseGameSocketReturn } from "../types/game.types";
+import { Notification } from "../components/Notifications";
 //
 // const socket: Socket = io("http://163.192.0.247", {
 //   transports: ["websocket"],
@@ -111,38 +115,43 @@ function Lobby({ onStart, playerName, setName }: LobbyProps) {
   );
 }
 
+
 export default function App() {
   const [page, setPage] = useState<"lobby" | "GameRoom">("lobby");
-  // const [players, setPlayers] = useState<string[]>([]);
   const [playerName, setName] = useState<string>("");
+  const [status, setStatus] = useState("");
+  const [shouldConnect, setShouldConnect] = useState<boolean>(false);
+  const { notifications, removeNotification, notify } = useNotifications();
 
+  const gameSocket: UseGameSocketReturn = useGameSocket(
+    () => setPage("GameRoom"),
+    () => setShouldConnect(false),
+    shouldConnect,
+    setStatus,
+    playerName,
+    notify.error
+  );
 
-  // useEffect(() => {
-  //   socket.on("connect", () => {
-  //     console.log("[Lobby] Connected to signaling server:", socket.id);
-  //   });
-  //
-  //   socket.on("lobby_state", (playersFromServer: string[]) => {
-  //     console.log("[Lobby] lobby_state:", playersFromServer);
-  //     setPlayers(playersFromServer);
-  //   });
-  //
-  //   socket.on("disconnect", () => {
-  //     console.log("[Lobby] Disconnected from signaling server");
-  //   });
-  //
-  //   return () => {
-  //     socket.off("lobby_state");
-  //   };
-  // }, []);
 
   return (
     <div style={{ padding: 20 }}>
+      {/* Render all notifications */}
+      {notifications.map((notification) => (
+        <Notification
+          key={notification.id}
+          id={notification.id}
+          message={notification.message}
+          type={notification.type}
+          duration={notification.duration}
+          onDismiss={removeNotification}
+        />
+      ))}
+
       {(page == "lobby") && (
         <Lobby
           onStart={() => {
             if (playerName !== "") {
-              setPage("GameRoom");
+              setShouldConnect(true);
             }
           }}
           players={["temp string"]}
@@ -152,7 +161,7 @@ export default function App() {
       )}
 
       {page === "GameRoom" && <GameRoom
-        playerName={playerName}
+        playerName={playerName} gameSocket={gameSocket} setStatus={setStatus} status={status}
       />}
     </div>
   );

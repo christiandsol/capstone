@@ -1,46 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { API_CONFIG } from '../config/api.config';
+import { emptyGSReturn } from '../constants/constants';
+import type { GameOverData, LobbyStatus, RestartStatus, UseGameSocketReturn } from '../types/game.types';
 
-interface LobbyStatus {
-    ready_count: number;
-    total_count: number;
-    min_players: number;
-    max_players: number;
-    players: { [name: string]: boolean };
-}
-
-interface RestartStatus {
-    restart_count: number;
-    total_count: number;
-    players: { [name: string]: boolean };
-}
-
-interface GameOverData {
-    winner: string;
-    mafia: string[];
-}
-
-interface UseGameSocketReturn {
-    role: string | null;
-    playerId: number | null;
-    lobbyStatus: LobbyStatus | null;
-    restartStatus: RestartStatus | null;
-    gameOverData: GameOverData | null;
-    deadPlayers: Set<string>;
-    sendHeadPosition: (position: string) => void;
-    setCurrentHead: (position: string) => void;
-    sendVoiceCommand: (command: number) => void;
-    sendReady: () => void;
-    sendRestart: () => void;
-}
 
 type NotifyFunction = (message: string, duration?: number) => string;
 
 export const useGameSocket = (
+    onSuccess: () => void,
+    onDeny: () => void,
+    shouldConnect: boolean,
     onStatusChange: (status: string) => void,
     playerName: string,
     notify?: NotifyFunction,
 ): UseGameSocketReturn => {
+
     const gameSocketRef = useRef<WebSocket | null>(null);
     const currentHeadRef = useRef<string>('headDown');
     const [role, setRole] = useState<string | null>(null);
@@ -65,6 +39,10 @@ export const useGameSocket = (
     };
 
     useEffect(() => {
+        if (!shouldConnect) {
+            return
+        }
+
         let isCurrentConnection = true;
 
         const connect = () => {
@@ -90,7 +68,6 @@ export const useGameSocket = (
 
                     console.log('[Game] Connected to Python game server');
                     onStatusChange('Connected to game server!');
-                    playTextToSpeech('Connected to game server!')
 
                     if (!hasSetupRef.current) {
                         const setupMsg = { action: 'setup', target: playerName };
@@ -104,6 +81,19 @@ export const useGameSocket = (
                     const data = JSON.parse(event.data);
                     console.log('[Game] Received:', data);
 
+                    if (data.action == 'acceptJoin') {
+                        console.log("[GAME] Joined Game")
+                        onSuccess();
+                    }
+                    if (data.action == 'denyJoin') {
+                        const reason: string = data.target
+                        console.log(notify);
+                        notify?.(`Unable to join: ${reason}`, 5000);
+                        console.log(`[GAME] Unable to join: ${reason}`)
+                        isCurrentConnection = false;
+                        hasSetupRef.current = false;
+                        onDeny?.();
+                    }
                     if (data.action === 'id_registered') {
                         console.log(`[Game] Player registered: ${data.player}`);
                         setPlayerId(data.player);
@@ -317,7 +307,7 @@ export const useGameSocket = (
             }
             gameSocketRef.current = null;
         };
-    }, [onStatusChange, playerName]);
+    }, [onStatusChange, playerName, shouldConnect]);
 
     const sendHeadPosition = (position: string) => {
         if (gameSocketRef.current?.readyState === WebSocket.OPEN) {
