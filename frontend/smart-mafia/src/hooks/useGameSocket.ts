@@ -102,6 +102,16 @@ export const useGameSocket = (
                         playTextToSpeech(lastStatusRef.current);
                     }
 
+                    if (data.action === 'lobby_reset') {
+                        setRole(null);
+                        setGameOverData(null);
+                        setRestartStatus(null);
+                        setDeadPlayers(new Set());
+                        if (data.target) {
+                            notify?.(`${data.target} disconnected — back to lobby`, 5000);
+                        }
+
+                    }
                     if (data.action === 'lobby_status') {
                         console.log("HERE")
                         setLobbyStatus(data.target);
