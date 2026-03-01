@@ -1,6 +1,5 @@
 import { useState } from "react";
 
-import Rpi from "./Rpi";
 import GameRoom from "./GameRoom";
 import { useGameSocket } from "../hooks/useGameSocket";
 import { useNotifications } from "../hooks/useNotifications";
