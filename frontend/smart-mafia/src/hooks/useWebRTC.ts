@@ -28,6 +28,17 @@ export const useWebRTC = (
     const socketToStreamRef = useRef<{ [socketId: string]: MediaStream }>({});
     const mySocketIdRef = useRef<string | null>(null);
 
+    // Re-update playerId's when they change
+    useEffect(() => {
+        if (playerId === null || !socketRef.current?.connected) return;
+
+        console.log(`[WebRTC] playerId updated to ${playerId}, re-broadcasting to all peers`);
+        socketRef.current.emit('broadcast-player-info', {
+            name: playerName,
+            id: playerId
+        });
+    }, [playerId, playerName]);
+
     useEffect(() => {
         if (!localStream) {
             console.log('[WebRTC] No local stream, skipping initialization');
@@ -272,7 +283,6 @@ export const useWebRTC = (
             closePeerConnection(socketId);
             if (disconnectedName) {
                 onPlayerDisconnected?.(disconnectedName);
-                removeRemoteStreamsForSocketId(socketId);
             }
         });
 
@@ -319,7 +329,8 @@ export const useWebRTC = (
             socketRef.current?.disconnect();
             Object.values(peerRefs.current).forEach((p) => p.close());
         };
-    }, [localStream, onStatusChange, playerName, playerId]);
+    }, [localStream, onStatusChange]);
+
 
     return { remoteStreams };
 };

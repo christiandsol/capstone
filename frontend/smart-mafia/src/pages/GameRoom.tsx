@@ -87,6 +87,7 @@ export default function GameRoom({ playerName, gameSocket, setStatus, status, on
       // Optimistically remove from lobby status display
       if (disconnectedName === '__self__') {
         // if you are the player to disconnect, go back to Lobby page
+        console.log("[DISCONNECT] Disconnected from web server, going back to lobby")
         onWebDisconnect();
       }
       if (lobbyStatus) {

@@ -213,7 +213,10 @@ class MafiaGame:
     async def broadcast(self, action: str, target=None):
         """Send a message to all connected web clients"""
         for ws, player_name in list(self.clients.items()):
-            await send_json(ws, player_name, action, target)
+            try: 
+                await send_json(ws, player_name, action, target)
+            except Exception as e:
+                print(f"[DEBUG] Failed to broadcast to {player_name}: {e}")
 
     async def broadcast_lobby_status(self):
         """Send current lobby state to all web clients"""
@@ -229,7 +232,7 @@ class MafiaGame:
                 for name, data in self.players.items()
             },
         }
-        for ws, player_name in self.clients.items():
+        for ws, player_name in list(self.clients.items()):
             await send_json(ws, player_name, "lobby_status", payload)
 
     async def broadcast_restart_status(self):
@@ -244,9 +247,9 @@ class MafiaGame:
                 for name, data in self.players.items()
             },
         }
-        for ws, player_name in self.clients.items():
+        for ws, player_name in list(self.clients.items()):
             await send_json(ws, player_name, "restart_status", payload)
-        for player_name, ws in self.rpis.items():
+        for player_name, ws in list(self.rpis.items()):
             await send_json(ws, player_name, "restart_status", payload)
 
     async def request_action_from_rpi(self, player_name: str, action: str):
@@ -504,7 +507,7 @@ class MafiaGame:
         """Transition to GAMEOVER and notify all clients"""
         print(f"[DEBUG] Game over — winner: {winner}")
         self.game_winner = winner
-        # NOTE: This is so that no one can join even when people are in the play again phase
+        # NOTE: This is commented so that no one can join even when people are in the play again phase
         # self.game_started = False
         self.state = "GAMEOVER"
         self.expected_signals = set()

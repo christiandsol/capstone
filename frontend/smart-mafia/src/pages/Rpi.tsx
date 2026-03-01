@@ -6,33 +6,6 @@ type RpiProps = {
   playerName: string;
 };
 
-const RPI_PORT = 8000;
-
-const connectRpi = async (ip_addr: string, playerName: string): Promise<boolean> => {
-  console.log(`player name: ${playerName}`)
-  // const resolvedIp = ip_addr;
-  // NOTE: HERE uncomment the resolved IP line if you don't want to use raspberry pi and you are debugging
-  const resolvedIp = import.meta.env.DEV
-    ? "127.0.0.1"
-    : ip_addr;
-
-  const rpi_url = `http://${resolvedIp}:${RPI_PORT}/api/${playerName}`
-  console.log(`[RPI_CONNECT] Raspberry pi connect signal sent out to: ${rpi_url}`)
-  try {
-    const res = await fetch(rpi_url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ip: ip_addr, playerName })
-    });
-    if (!res.ok) {
-      throw new Error(`Error trying to connect to server, [STATUS CODE: ] ${res.status}`)
-    }
-    return res.ok
-  } catch (error) {
-    throw new Error(`Error trying to connect to server, could not get result`)
-  }
-  return false
-};
 
 export default function Rpi({ playerName }: RpiProps) {
   const [ip_addr, setIP] = useState<string>("");

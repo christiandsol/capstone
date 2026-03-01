@@ -5,6 +5,7 @@ import websockets
 from websockets.typing import Data
 import sys
 import os
+import aiohttp
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'berryIMU'))
 from gesturetwo import BerryIMUInterface, GestureRecognizer
@@ -58,7 +59,6 @@ def record_gesture_blocking(imu, duration_s: float = 1.0, sample_rate_hz: float 
     return samples
 
 async def notify_web_server_disconnect(name: str):
-    import aiohttp
     web_url = f"{HTTP_PROTO}://{SERVER_IP}:{WEB_SERVER_PORT}"
     try:
         async with aiohttp.ClientSession() as session:
@@ -132,14 +132,15 @@ async def rpi_helper(ws, name, imu, recognizer):
                 print("[DEBUG] Received restart, restarting game, your role may change")
                 continue
 
+            success = False
             if action in ["vote", "kill", "save"]:
-                if cmd == 'y':
-                    success = await handle_vote(ws, imu, recognizer, name)
-                else:
-                    success = await handle_debug_vote(ws, name)
-
-                if not success:
-                    print("[Pi] Vote failed, waiting for next server message...")
+                while not success: 
+                    if cmd == 'y':
+                        success = await handle_vote(ws, imu, recognizer, name)
+                    else:
+                        success = await handle_debug_vote(ws, name)
+                    if not success: 
+                        print("[Pi] Vote failed, waiting for next server message...")
                 continue
 
     except websockets.exceptions.ConnectionClosedError:
@@ -175,7 +176,7 @@ async def rpi_handler(name):
             recognizer = GestureRecognizer()
             await rpi_helper(ws, name, imu, recognizer)
     except KeyboardInterrupt:
-        print("[DEBUG] Ctrl+C detected, disconneting cleanly...")
+        print("[DEBUG] Ctrl+C detected, disconnecting cleanly...")
     finally: 
         await notify_web_server_disconnect(name)
 

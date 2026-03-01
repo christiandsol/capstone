@@ -241,17 +241,29 @@ async def handler(ws: WebSocketServerProtocol):
         print(f"[DEBUG] Connection closed unexpectedly for: {player_name}")
     except Exception as e:
         print(f"[ERROR] Handler error for {player_name}: {e}")
+        print(f"[DEBUG] Connection closed for {player_name}: code={e.code} reason={e.reason}")
         import traceback
         traceback.print_exc()
     finally:
         if player_name:
+            id = game.name_to_id(player_name)
             print(f"[DEBUG] Cleaning up {player_name}")
+            print(f"[DEBUG] ID of player being cleaned up: {id}")
+            print(f"ID and name mappings")
+            print(f"{game.player_id_to_name}")
+            print(f"{game.name_to_player_id}")
+            print(f"")
             async with lock:
                 await clean_player(player_name, ws)
 
 
 async def clean_player(player_name: str, ws: WebSocketServerProtocol):
     """Remove a disconnected player and reset the game if one was in progress"""
+
+    # Guard against double disconnects
+    if player_name not in game.players and ws not in game.clients and player_name not in game.rpis:
+        print(f"[DEBUG] {player_name} already cleaned up, skipping")
+        return
 
     # Notify and disconnect the player's RPi if one is registered
     if player_name in game.rpis:
@@ -260,6 +272,7 @@ async def clean_player(player_name: str, ws: WebSocketServerProtocol):
         try: 
             await send_json(rpi_ws, player_name, "disconnect", None)
         except Exception:
+            print(f"[DEBUG] Exception for player {player_name} when attempting to disconnect")
             pass
         del game.rpis[player_name]
 
@@ -292,17 +305,22 @@ async def clean_player(player_name: str, ws: WebSocketServerProtocol):
     print(f"[DEBUG] {player_name} left mid-game — resetting to lobby")
     game.reset_game_state()
 
-    for i, name in enumerate(game.players.keys(), start=1):
+    clients_snapshot = list(game.clients.items())
+
+    for i, (client_ws, name) in enumerate(clients_snapshot, start=1):
         game.player_id_to_name[i] = name
         game.name_to_player_id[name] = i
-        # Notify each client of their new ID
-        client_ws = next((ws for ws, n in game.clients.items() if n == name), None)
-        if client_ws:
+        try:
             await send_json(client_ws, i, "id_registered", None)
+        except Exception as e:
+            print(f"[DEBUG] Failed to send id_registered to {name}: {e}")
+            # Don't cascade — let their own finally block handle cleanup
 
-    await game.broadcast("lobby_reset", player_name)
-    await game.broadcast_lobby_status()
-
+    try:
+        await game.broadcast("lobby_reset", player_name)
+        await game.broadcast_lobby_status()
+    except Exception as e:
+        print(f"[DEBUG] Broadcast failed during reset: {e}")
 
 # ---------------------------------------------------------------------------
 # Entry point

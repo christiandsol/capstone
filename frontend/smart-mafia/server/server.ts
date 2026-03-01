@@ -65,7 +65,7 @@ io.on("connection", socket => {
     console.log("Broadcasting disconnect now");
     socket.rooms.forEach(room => {
       if (room !== socket.id) {
-        io.in(room).emit("user-disconnected", {  // io.in includes the sender
+        socket.to(room).emit("user-disconnected", {
           socketId: socket.id,
           playerName: (socket as any).playerName
         });
@@ -73,10 +73,6 @@ io.on("connection", socket => {
       }
     });
 
-    socket.emit("user-disconnected", {
-      socketId: socket.id,
-      playerName: (socket as any).playerName
-    });
   });
 });
 
