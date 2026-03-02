@@ -285,6 +285,11 @@ export const useGameSocket = (
                     onStatusChange(newStatus);
                     playTextToSpeech(newStatus)
 
+                    setRole(null);
+                    setGameOverData(null);
+                    setRestartStatus(null);
+                    setDeadPlayers(new Set());
+
                     if (isCurrentConnection) {
                         reconnectTimeoutRef.current = setTimeout(() => {
                             console.log('[Game] Attempting to reconnect...');
@@ -319,6 +324,23 @@ export const useGameSocket = (
             gameSocketRef.current = null;
         };
     }, [onStatusChange, playerName, shouldConnect]);
+
+    useEffect(() => {
+        if (!shouldConnect) return;
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                const ws = gameSocketRef.current;
+                if (ws?.readyState === WebSocket.OPEN) {
+                    console.log('[Game] Tab visible again, sending heartbeat');
+                    ws.send(JSON.stringify({ action: 'headDown', target: null }));
+                }
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, [shouldConnect]);
 
     const sendHeadPosition = (position: string) => {
         if (gameSocketRef.current?.readyState === WebSocket.OPEN) {
