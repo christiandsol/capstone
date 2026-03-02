@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useGameSocket } from '../hooks/useGameSocket';
 import { useVoiceRecognition } from '../hooks/useVoiceRecognition';
 import { useWebRTC } from '../hooks/useWebRTC';
 import { useMediaStream } from '../hooks/useMediaStream';
@@ -9,7 +8,6 @@ import { StatusDisplay } from '../components/StatusDisplay';
 import { VoiceControls } from '../components/VoiceControls';
 import { VideoControls } from '../components/VideoControls';
 import { RemoteVideo } from '../components/RemoteVideo';
-import { Notification } from '../components/Notifications';
 import type { UseGameSocketReturn } from '../types/game.types';
 
 type GameProps = {
@@ -17,8 +15,6 @@ type GameProps = {
   gameSocket: UseGameSocketReturn;
   setStatus: (status: string) => void;
   status: string;
-  onSuccess: () => void,
-  onDeny: () => void,
   onWebDisconnect: () => void,
 };
 
@@ -36,7 +32,7 @@ export default function GameRoom({ playerName, gameSocket, setStatus, status, on
   const [hasClickedRestart, setHasClickedRestart] = useState(false);
 
   // Initialize notifications
-  const { notifications, removeNotification, notify } = useNotifications();
+  const { notify } = useNotifications();
 
   // Pass notify to useGameSocket
   const {

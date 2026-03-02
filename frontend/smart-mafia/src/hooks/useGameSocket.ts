@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { API_CONFIG } from '../config/api.config';
-import { emptyGSReturn } from '../constants/constants';
 import type { GameOverData, LobbyStatus, RestartStatus, UseGameSocketReturn } from '../types/game.types';
 
 

@@ -1,5 +1,5 @@
 
-export const emptyGSReturn: UseGameSocketReturn = {
+export const emptyGSReturn = {
     role: null,
     playerId: null,
     lobbyStatus: null,
