@@ -367,12 +367,12 @@ class MafiaGame:
         if self.state == "ASSIGN":
             await self.broadcast_roles()
             await self.broadcast("heads_down")
-            self.state = "HEADSDOWN"
+            self.state = "HEADSDOWN_MAFIA"
             self.expected_signals = {"headUp", "headDown"}
             print("[DEBUG] Roles sent — waiting for heads down")
 
         # HEADSDOWN: wait for all alive players to put heads down
-        if self.state == "HEADSDOWN" and self.check_heads_down([]):
+        if self.state == "HEADSDOWN_MAFIA" and self.check_heads_down([]):
             self.state = "MAFIAVOTE"
             self.expected_signals = {"headUp", "headDown", "voiceCommand", "target"}
             await self.broadcast("night_phase_kill")
@@ -383,6 +383,9 @@ class MafiaGame:
 
         # MAFIAVOTE: wait for mafia to agree on a kill target
         if self.state == "MAFIAVOTE":
+            if not self.check_heads_down(self._active_mafia_names()):
+                await self.broadcast("head_down")
+                return 
             kill_target = self.get_mafia_kill_target()
             if kill_target is None:
                 print(f"[DEBUG] Kill Target is None")
@@ -405,16 +408,28 @@ class MafiaGame:
             if winner:
                 await self._end_game(winner)
                 return
+            
+            self.state = "HEADSDOWN_DOCTOR"
+            self.expected_signals = {"headUp", "headDown"}
+            print("[DEBUG] Everyone heads down")
 
+        # HEADSDOWN: wait for all alive players to put heads down
+        if self.state == "HEADSDOWN_DOCTOR" and self.check_heads_down([]):
             self.state = "DOCTORVOTE"
             self.expected_signals = {"headUp", "headDown", "voiceCommand", "target"}
+            await self.broadcast("night_phase_kill")
             print("[DEBUG] Doctor voting")
             for doctor_name in self._active_doctor_names():
                 await self.request_action_from_rpi(doctor_name, "save")
             return
 
+
         # DOCTORVOTE: wait for doctor(s) to agree on a save target
         if self.state == "DOCTORVOTE":
+            if not self.check_heads_down(self._active_doctor_names()):
+                await self.broadcast("head_down")
+                return 
+
             save_target = self.get_doctor_save_target()
 
             if save_target is None and self.doctor_count > 0:

@@ -130,6 +130,14 @@ export const useGameSocket = (
                         }
                     }
 
+
+                    if (data.action == "head_down") {
+                        const newStatus = `Everyone, please put head down`;
+                        lastStatusRef.current = newStatus;
+                        onStatusChange(newStatus);
+                        playTextToSpeech(newStatus);
+                    }
+
                     if (data.action === 'restart_status') {
                         setRestartStatus(data.target);
                         const { restart_count, total_count } = data.target;

@@ -10,7 +10,9 @@ import aiohttp
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'berryIMU'))
 from gesturetwo import BerryIMUInterface, GestureRecognizer
 
+# NOTE: production:
 SERVER_IP = "mafiacapstone.duckdns.org"
+# NOTE: local development:
 # SERVER_IP = "127.0.0.1"
 GAME_SERVER_PORT = 5050
 WEB_SERVER_PORT = 3001
@@ -192,7 +194,9 @@ async def rpi_helper(ws, name, imu, recognizer):
 
 
 async def rpi_handler(name):
+    # NOTE: production
     uri = f"wss://{SERVER_IP}/ws"
+    # NOTE: Local development
     # uri = f"ws://{SERVER_IP}:{GAME_SERVER_PORT}"
 
     print(f"[DEBUG] Connecting to {uri}")
