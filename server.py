@@ -81,6 +81,11 @@ async def handler(ws: WebSocketServerProtocol):
                 continue
 
             action = msg.get("action")
+            # ----------------------------------------------------------------
+            # Keepalive connection
+            # ----------------------------------------------------------------
+            if action == "ping":
+                continue
 
             # ----------------------------------------------------------------
             # Voice commands
@@ -265,6 +270,12 @@ async def clean_player(player_name: str, ws: WebSocketServerProtocol):
         print(f"[DEBUG] {player_name} already cleaned up, skipping")
         return
 
+    # DEBUG: Where the disconnect comes from
+    if ws in game.rpis.values():
+        print(f"[DEBUG] Raspberry pi caused disconnect")
+    else:
+        print(f"[DEBUG] Browser caused disconnect")
+
     # Notify and disconnect the player's RPi if one is registered
     if player_name in game.rpis:
         print(f"[DEBUG] Cleaning up {player_name}'s Raspberry pi")
@@ -327,7 +338,7 @@ async def clean_player(player_name: str, ws: WebSocketServerProtocol):
 # ---------------------------------------------------------------------------
 
 async def main():
-    async with websockets.serve(handler, HOST, PORT, open_timeout = 15, ping_interval=15, ping_timeout=45, close_timeout=15):
+    async with websockets.serve(handler, HOST, PORT, open_timeout = 15, ping_interval=None, ping_timeout=45, close_timeout=15):
         print(f"WebSocket server running on {PORT}")
         await asyncio.Future()
 

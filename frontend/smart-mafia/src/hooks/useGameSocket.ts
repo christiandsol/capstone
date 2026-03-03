@@ -349,6 +349,20 @@ export const useGameSocket = (
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, [shouldConnect]);
 
+
+    // Inside useGameSocket, after the socket connects:
+    useEffect(() => {
+        if (!gameSocketRef.current) return;
+
+        const keepalive = setInterval(() => {
+            if (gameSocketRef.current?.readyState === WebSocket.OPEN) {
+                gameSocketRef.current?.send(JSON.stringify({ action: "ping" }));
+            }
+        }, 30000); // every 30 seconds
+
+        return () => clearInterval(keepalive);
+    }, [gameSocketRef]);
+
     const sendHeadPosition = (position: string) => {
         if (gameSocketRef.current?.readyState === WebSocket.OPEN) {
             gameSocketRef.current.send(JSON.stringify({
