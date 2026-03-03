@@ -192,8 +192,8 @@ async def rpi_helper(ws, name, imu, recognizer):
 
 
 async def rpi_handler(name):
-    # uri = f"wss://{SERVER_IP}/ws"
-    uri = f"ws://{SERVER_IP}:{GAME_SERVER_PORT}"
+    uri = f"wss://{SERVER_IP}/ws"
+    # uri = f"ws://{SERVER_IP}:{GAME_SERVER_PORT}"
 
     print(f"[DEBUG] Connecting to {uri}")
 
