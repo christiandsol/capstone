@@ -391,6 +391,8 @@ class MafiaGame:
             kill_target = self.get_mafia_kill_target()
             if kill_target is None:
                 print(f"[DEBUG] Kill Target is None")
+                for mafia_name in self._active_mafia_names():
+                    await self.request_action_from_rpi(mafia_name, "kill")
                 return  # Not ready yet (or disagreement was reset — they'll re-vote)
 
             print(f"[DEBUG] Mafia agreed to kill: {kill_target}")
@@ -436,6 +438,8 @@ class MafiaGame:
             save_target = self.get_doctor_save_target()
 
             if save_target is None and self.doctor_count > 0:
+                for doctor_name in self._active_doctor_names():
+                    await self.request_action_from_rpi(doctor_name, "save")
                 return  # Doctor(s) haven't chosen yet
 
             self.last_saved = save_target
