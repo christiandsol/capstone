@@ -106,6 +106,7 @@ export const useGameSocket = (
                         setGameOverData(null);
                         setRestartStatus(null);
                         setDeadPlayers(new Set());
+                        setLobbyStatus(null)
                         if (data.target) {
                             notify?.(`${data.target} disconnected — back to lobby`, 5000);
                         }

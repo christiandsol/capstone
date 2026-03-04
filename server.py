@@ -81,11 +81,6 @@ async def handler(ws: WebSocketServerProtocol):
                 continue
 
             action = msg.get("action")
-            # ----------------------------------------------------------------
-            # Keepalive connection
-            # ----------------------------------------------------------------
-            if action == "ping":
-                continue
 
             # ----------------------------------------------------------------
             # Voice commands
@@ -111,6 +106,12 @@ async def handler(ws: WebSocketServerProtocol):
                     continue
 
                 print(f"[VOICE] Unhandled code={ctrl_code} from {player_name}")
+                continue
+
+            # ----------------------------------------------------------------
+            # Ping keepalive
+            # ----------------------------------------------------------------
+            if action == "ping":
                 continue
 
             # ----------------------------------------------------------------
@@ -246,7 +247,6 @@ async def handler(ws: WebSocketServerProtocol):
         print(f"[DEBUG] Connection closed unexpectedly for: {player_name}")
     except Exception as e:
         print(f"[ERROR] Handler error for {player_name}: {e}")
-        print(f"[DEBUG] Connection closed for {player_name}: code={e.code} reason={e.reason}")
         import traceback
         traceback.print_exc()
     finally:
@@ -280,7 +280,7 @@ async def clean_player(player_name: str, ws: WebSocketServerProtocol):
     if player_name in game.rpis:
         print(f"[DEBUG] Cleaning up {player_name}'s Raspberry pi")
         rpi_ws = game.rpis[player_name]
-        try: 
+        try:
             await send_json(rpi_ws, player_name, "disconnect", None)
         except Exception:
             print(f"[DEBUG] Exception for player {player_name} when attempting to disconnect")
@@ -296,9 +296,9 @@ async def clean_player(player_name: str, ws: WebSocketServerProtocol):
     if player_name in game.players:
         player_id = game.name_to_player_id.get(player_name)
         if player_id is not None:
-            if player_id in game.player_id_to_name:  # add this check
+            if player_id in game.player_id_to_name:
                 del game.player_id_to_name[player_id]
-            if player_name in game.name_to_player_id:  # add this check
+            if player_name in game.name_to_player_id:
                 del game.name_to_player_id[player_name]
         del game.players[player_name]
 
@@ -306,7 +306,7 @@ async def clean_player(player_name: str, ws: WebSocketServerProtocol):
 
     if len(game.players) < 3:
         game.game_started = False
-    #
+
     # If no game was in progress, just refresh the lobby for remaining players
     if game.state == "LOBBY":
         await game.broadcast_lobby_status()
@@ -315,6 +315,11 @@ async def clean_player(player_name: str, ws: WebSocketServerProtocol):
     # Mid-game disconnect — reset everything and send everyone back to lobby
     print(f"[DEBUG] {player_name} left mid-game — resetting to lobby")
     game.reset_game_state()
+
+    # Sync clients to players — remove any clients not in game.players
+    for client_ws, name in list(game.clients.items()):
+        if name not in game.players:
+            del game.clients[client_ws]
 
     clients_snapshot = list(game.clients.items())
 
@@ -325,7 +330,6 @@ async def clean_player(player_name: str, ws: WebSocketServerProtocol):
             await send_json(client_ws, i, "id_registered", None)
         except Exception as e:
             print(f"[DEBUG] Failed to send id_registered to {name}: {e}")
-            # Don't cascade — let their own finally block handle cleanup
 
     try:
         await game.broadcast("lobby_reset", player_name)
@@ -333,12 +337,13 @@ async def clean_player(player_name: str, ws: WebSocketServerProtocol):
     except Exception as e:
         print(f"[DEBUG] Broadcast failed during reset: {e}")
 
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
 async def main():
-    async with websockets.serve(handler, HOST, PORT, open_timeout = 15, ping_interval=None, ping_timeout=45, close_timeout=15):
+    async with websockets.serve(handler, HOST, PORT, open_timeout=15, ping_interval=None, ping_timeout=45, close_timeout=15):
         print(f"WebSocket server running on {PORT}")
         await asyncio.Future()
 

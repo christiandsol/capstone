@@ -39,7 +39,6 @@ export default function GameRoom({ playerName, gameSocket, setStatus, status, on
     role,
     playerId,
     lobbyStatus,
-    setLobbyStatus,
     restartStatus,
     gameOverData,
     deadPlayers,
@@ -86,17 +85,6 @@ export default function GameRoom({ playerName, gameSocket, setStatus, status, on
         console.log("[DISCONNECT] Disconnected from web server, going back to lobby")
         onWebDisconnect();
       }
-      if (lobbyStatus) {
-        const updatedPlayers = { ...lobbyStatus.players };
-        delete updatedPlayers[disconnectedName];
-        setLobbyStatus({
-          ...lobbyStatus,
-          total_count: lobbyStatus.total_count - 1,
-          ready_count: updatedPlayers[disconnectedName] ? lobbyStatus.ready_count - 1 : lobbyStatus.ready_count,
-          players: updatedPlayers
-        });
-      }
-
     }
   );
 
