@@ -166,7 +166,7 @@ class GestureRecognizer:
 
         Returns:
             1-8 if confidently recognized, or None if unclear.
-            
+
         Gesture mapping:
             - Digit 1: Up
             - Digit 2: Right
@@ -180,81 +180,63 @@ class GestureRecognizer:
         if not samples:
             return None
 
-        # Calculate motion by looking at the RANGE (max - min) of each axis
+        n = len(samples)
         ax_values = [s[0] for s in samples]
         ay_values = [s[1] for s in samples]
-        
-        # Calculate range (movement magnitude) for each axis
+
         ax_range = max(ax_values) - min(ax_values)
         ay_range = max(ay_values) - min(ay_values)
-        
-        # Calculate average change direction
-        mean_ax = sum(ax_values) / len(ax_values)
-        mean_ay = sum(ay_values) / len(ay_values)
-        
-        # Get baseline (first few samples) to detect change from rest
-        baseline_samples = min(5, len(samples) // 4)
-        baseline_ax = sum(ax_values[:baseline_samples]) / baseline_samples
-        baseline_ay = sum(ay_values[:baseline_samples]) / baseline_samples
-        
-        # Calculate change from baseline
-        delta_ax = mean_ax - baseline_ax
-        delta_ay = mean_ay - baseline_ay
 
-        # Threshold for significant movement
-        min_movement = 200.0  # Minimum range to consider it a gesture
-        min_diagonal_movement = 150.0  # Lower threshold for diagonal (both axes need movement)
+        # Use start vs end of gesture for direction (more reliable than mean vs baseline)
+        start_n = max(1, n // 5)   # first 20%
+        end_n = max(1, n * 3 // 10)  # last 30%
+        start_ax = sum(ax_values[:start_n]) / start_n
+        start_ay = sum(ay_values[:start_n]) / start_n
+        end_ax = sum(ax_values[-end_n:]) / end_n
+        end_ay = sum(ay_values[-end_n:]) / end_n
+        delta_ax = end_ax - start_ax
+        delta_ay = end_ay - start_ay
 
-        # Check if there's significant movement
+        # Calibrated thresholds: lower = more sensitive, easier to trigger
+        min_movement = 80.0
+        min_diagonal_movement = 60.0
+        direction_threshold = 40.0
+        diagonal_threshold = 30.0
+
         max_range = max(ax_range, ay_range)
         if max_range < min_movement:
             return None
 
-        # Threshold for direction detection
-        direction_threshold = 100.0  # Minimum delta to consider a direction
-        diagonal_threshold = 70.0  # Lower threshold for diagonal detection
+        # Prefer cardinal if one axis clearly dominates (avoids diagonal when user meant up/down/left/right)
+        range_ratio = max(ax_range, ay_range) / (min(ax_range, ay_range) + 1e-6)
+        use_diagonal = (
+            ax_range >= min_diagonal_movement
+            and ay_range >= min_diagonal_movement
+            and range_ratio < 2.2
+        )
 
-        # Check for diagonal movements first (both axes have significant movement)
-        # Diagonal movements require both axes to show movement
-        if ax_range >= min_diagonal_movement and ay_range >= min_diagonal_movement:
-            # Both axes have significant movement - check for diagonal
-            
-            # Up-Right: both positive
+        if use_diagonal:
             if delta_ay > diagonal_threshold and delta_ax > diagonal_threshold:
                 return 6
-            
-            # Up-Left: ay positive, ax negative
-            elif delta_ay > diagonal_threshold and delta_ax < -diagonal_threshold:
+            if delta_ay > diagonal_threshold and delta_ax < -diagonal_threshold:
                 return 5
-            
-            # Down-Right: ay negative, ax positive
-            elif delta_ay < -diagonal_threshold and delta_ax > diagonal_threshold:
+            if delta_ay < -diagonal_threshold and delta_ax > diagonal_threshold:
                 return 7
-            
-            # Down-Left: both negative
-            elif delta_ay < -diagonal_threshold and delta_ax < -diagonal_threshold:
+            if delta_ay < -diagonal_threshold and delta_ax < -diagonal_threshold:
                 return 8
 
-        # If not diagonal, check for cardinal directions
-        # Dominant vertical movement (up/down)
+        # Cardinal directions
         if ay_range >= ax_range:
-            if delta_ay > direction_threshold:  # Upward
+            if delta_ay > direction_threshold:
                 return 1
-            elif delta_ay < -direction_threshold:  # Downward
+            if delta_ay < -direction_threshold:
                 return 3
-            else:
-                return None  # Not clear enough
-
-        # Dominant horizontal movement (left/right)
-        else:  # ax_range > ay_range
-            if delta_ax > direction_threshold:  # Rightward
+        else:
+            if delta_ax > direction_threshold:
                 return 2
-            elif delta_ax < -direction_threshold:  # Leftward
+            if delta_ax < -direction_threshold:
                 return 4
-            else:
-                return None  # Not clear enough
 
-        # Fallback: nothing recognized
         return None
 
 
