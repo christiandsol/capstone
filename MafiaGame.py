@@ -304,9 +304,12 @@ class MafiaGame:
             player_data["save"] = None
             player_data["alive"] = True
 
+        # Reassign IDs based on current players
         self.player_id_to_name = {}
         self.name_to_player_id = {}
-
+        for i, name in enumerate(self.players.keys(), start=1):
+            self.player_id_to_name[i] = name
+            self.name_to_player_id[name] = i
 
         self.mafia_name_one = None
         self.mafia_name_two = None
@@ -323,7 +326,6 @@ class MafiaGame:
         self.expected_signals = {"setup"}
 
         print("[DEBUG] Game state reset complete")
-
     def check_heads_down(self, allowed: List[str]) -> bool:
         """Return True if every alive player (not in `allowed`) has their head down"""
         for player_name, data in self.players.items():
