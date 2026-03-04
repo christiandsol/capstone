@@ -512,7 +512,7 @@ class MafiaGame:
                 player_data["head"] = "up"
                 player_data["ready_to_vote"] = False
 
-            self.state = "HEADSDOWN"
+            self.state = "HEADSDOWN_MAFIA"
             self.expected_signals = {"headUp", "headDown"}
             print("[DEBUG] Back to night phase")
             await self.broadcast("heads_down", voted_out_name)
