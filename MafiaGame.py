@@ -412,6 +412,7 @@ class MafiaGame:
             self.state = "HEADSDOWN_DOCTOR"
             self.expected_signals = {"headUp", "headDown"}
             print("[DEBUG] Everyone heads down")
+            return
 
         # HEADSDOWN: wait for all alive players to put heads down
         if self.state == "HEADSDOWN_DOCTOR" and self.check_heads_down([]):
@@ -445,6 +446,7 @@ class MafiaGame:
 
             await self.broadcast("doctor_save", save_target)
             self.state = "NARRATE"
+            return
 
         # NARRATE: announce what happened overnight, then move to day discussion
         if self.state == "NARRATE":
@@ -467,6 +469,7 @@ class MafiaGame:
             self.state = "READYTOVOTE"
             self.expected_signals = {"voiceCommand"}
             print("[DEBUG] Waiting for players to say 'ready to vote'")
+            return
 
         # READYTOVOTE: wait for all alive players to signal they're ready
         if self.state == "READYTOVOTE" and self.check_everyone_ready_to_vote():
