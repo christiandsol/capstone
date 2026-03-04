@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import imuDiagram from '../assets/IMUdiagram.png';
 import { useVoiceRecognition } from '../hooks/useVoiceRecognition';
 import { useWebRTC } from '../hooks/useWebRTC';
 import { useMediaStream } from '../hooks/useMediaStream';
@@ -154,6 +155,10 @@ export default function GameRoom({ playerName, gameSocket, setStatus, status, on
           Game Room
         </h1>
       </div>
+
+   
+
+
 
       <div style={{ padding: "20px" }}>
         <StatusDisplay
@@ -430,6 +435,51 @@ export default function GameRoom({ playerName, gameSocket, setStatus, status, on
           )}
         </div>
       </div>
+
+      
+      <section style={{
+        margin: '40px auto 0 auto',
+        maxWidth: '1000px',
+        background: '#232323',
+        borderRadius: '12px',
+        boxShadow: '0 2px 12px rgba(0,0,0,0.18)',
+        padding: '32px',
+        color: '#fff',
+        width: 'calc(100% - 40px)',
+      }}>
+        <h2 style={{ textAlign: 'center', color: '#ffd700', marginBottom: '18px', fontSize: '2rem' }}>Game Controls Guide</h2>
+        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: '32px', justifyContent: 'center' }}>
+          <div style={{ flex: '0 0 340px', textAlign: 'center' }}>
+            <h3 style={{ color: '#ffd700', fontSize: '1.2rem', marginBottom: '12px', textAlign: 'center' }}>Gesture Recognition</h3>
+
+            <img src={imuDiagram} alt="IMU Directions for Voting" style={{ maxWidth: '340px', width: '100%', height: 'auto', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }} />
+            <div style={{ marginTop: '0.5rem', fontSize: '1.1rem', color: '#ffd700', textAlign: 'center' }}>
+             Move your IMU as shown to select the ID of the player you choose
+            </div>
+          </div>
+          <div style={{ flex: '1', minWidth: '260px' }}>
+            <h3 style={{ color: '#ffd700', fontSize: '1.2rem', marginBottom: '12px', textAlign: 'center' }}>Voice Commands</h3>
+            <table style={{ width: '100%', background: '#181818', borderRadius: '8px', borderCollapse: 'collapse', fontSize: '1.05rem', color: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.10)' }}>
+              <thead>
+                <tr style={{ background: '#333' }}>
+                  <th style={{ padding: '10px', borderRadius: '8px 0 0 0' }}>Command</th>
+                  <th style={{ padding: '10px', borderRadius: '0 8px 0 0' }}>Functionality</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style={{ padding: '10px', color: '#ffd700' }}> "assign players"</td>
+                  <td style={{ padding: '10px' }}>Mark yourself as ready to start the game</td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '10px', color: '#ffd700' }}>"ready to vote"</td>
+                  <td style={{ padding: '10px' }}>Mark yourself as ready to vote for Mafia</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

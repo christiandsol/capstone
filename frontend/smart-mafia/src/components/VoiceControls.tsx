@@ -54,7 +54,7 @@ export const VoiceControls: React.FC<VoiceControlsProps> = ({
         )}
       </div>
       <div style={{ marginTop: '10px', color: '#888', fontSize: '14px' }}>
-        <strong>Voice Commands:</strong> Try saying: "assign players", "ready to vote", "night time"
+        <strong>Voice Commands:</strong> Use "assign players" to mark yourself ready, use "ready to vote" when you are ready to vote for Mafia
       </div>
     </div>
   );
