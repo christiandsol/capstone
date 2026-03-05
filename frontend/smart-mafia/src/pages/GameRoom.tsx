@@ -156,7 +156,7 @@ export default function GameRoom({ playerName, gameSocket, setStatus, status, on
         </h1>
       </div>
 
-   
+
 
 
 
@@ -436,7 +436,7 @@ export default function GameRoom({ playerName, gameSocket, setStatus, status, on
         </div>
       </div>
 
-      
+
       <section style={{
         margin: '40px auto 0 auto',
         maxWidth: '1000px',
@@ -454,7 +454,7 @@ export default function GameRoom({ playerName, gameSocket, setStatus, status, on
 
             <img src={imuDiagram} alt="IMU Directions for Voting" style={{ maxWidth: '340px', width: '100%', height: 'auto', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }} />
             <div style={{ marginTop: '0.5rem', fontSize: '1.1rem', color: '#ffd700', textAlign: 'center' }}>
-             Move your IMU as shown to select the ID of the player you choose
+              Move your IMU as shown to select the ID of the player you choose
             </div>
           </div>
           <div style={{ flex: '1', minWidth: '260px' }}>
