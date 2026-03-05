@@ -39,6 +39,9 @@ class MafiaGame:
         self.game_winner: Optional[str] = None
         self.game_started: bool = False
 
+
+        self.next_player_id: int = 1
+
     # ------------------------------------------------------------------
     # helpers
     # ------------------------------------------------------------------
@@ -51,6 +54,19 @@ class MafiaGame:
 
     def name_to_id(self, player_name: str) -> Optional[int]:
         return self.name_to_player_id.get(player_name)
+
+    async def notify_clients_player_ids(self):
+        """
+        Send id_registered to each connected client with their current player ID.
+        Call after reset_game_state() on GAMEOVER restart so the frontend stays in sync.
+        """
+        for ws, name in list(self.clients.items()):
+            pid = self.name_to_player_id.get(name)
+            if pid is not None:
+                try:
+                    await send_json(ws, pid, "id_registered", None)
+                except Exception as e:
+                    print(f"[DEBUG] Failed to send id_registered to {name}: {e}")
 
     def _active_mafia_names(self) -> List[str]:
         """return list of currently assigned mafia player names"""
@@ -305,11 +321,13 @@ class MafiaGame:
             player_data["alive"] = True
 
         # Reassign IDs based on current players
-        self.player_id_to_name = {}
-        self.name_to_player_id = {}
-        for i, name in enumerate(self.players.keys(), start=1):
-            self.player_id_to_name[i] = name
-            self.name_to_player_id[name] = i
+        # self.player_id_to_name = {}
+        # self.name_to_player_id = {}
+        # for i, name in enumerate(self.players.keys(), start=1):
+        #     self.player_id_to_name[i] = name
+        #     self.name_to_player_id[name] = i
+
+        self.renumber_remaining_player_ids()
 
         self.mafia_name_one = None
         self.mafia_name_two = None
@@ -326,6 +344,22 @@ class MafiaGame:
         self.expected_signals = {"setup"}
 
         print("[DEBUG] Game state reset complete")
+
+
+    def renumber_remaining_player_ids(self):
+        """
+        Reassign player IDs to 1, 2, 3, ... for current players and set
+        next_player_id so the next joiner gets the next number. Call after
+        a disconnect (lobby or mid-game) so IDs stay compact and consistent.
+        """
+        self.player_id_to_name = {}
+        self.name_to_player_id = {}
+        for i, name in enumerate(list(self.players.keys()), start=1):
+            self.player_id_to_name[i] = name
+            self.name_to_player_id[name] = i
+        self.next_player_id = len(self.players) + 1
+
+
     def check_heads_down(self, allowed: List[str]) -> bool:
         """Return True if every alive player (not in `allowed`) has their head down"""
         for player_name, data in self.players.items():
@@ -525,6 +559,7 @@ class MafiaGame:
         if self.state == "GAMEOVER" and self.check_everyone_wants_restart():
             print("[DEBUG] All players want to restart!")
             self.reset_game_state()
+            await self.notify_clients_player_ids()
             await self.broadcast_lobby_status()
 
     async def _end_game(self, winner: str):

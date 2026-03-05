@@ -153,7 +153,9 @@ async def handler(ws: WebSocketServerProtocol):
                         await ws.close(1008, "Game is full")
                         return
 
-                    player_id = len(game.players) + 1
+                    player_id = game.next_player_id
+                    game.next_player_id += 1
+                    # player_id = len(game.players) + 1
                     game.player_id_to_name[player_id] = player_name
                     game.name_to_player_id[player_name] = player_id
                     game.clients[ws] = player_name
@@ -265,6 +267,7 @@ async def handler(ws: WebSocketServerProtocol):
 async def clean_player(player_name: str, ws: WebSocketServerProtocol):
     """Remove a disconnected player and reset the game if one was in progress"""
 
+
     # Guard against double disconnects
     if player_name not in game.players and ws not in game.clients and player_name not in game.rpis:
         print(f"[DEBUG] {player_name} already cleaned up, skipping")
@@ -304,11 +307,15 @@ async def clean_player(player_name: str, ws: WebSocketServerProtocol):
 
     print(f"[DEBUG] {player_name} removed")
 
+    game.next_player_id = len(game.players) + 1
+
     if len(game.players) < 3:
         game.game_started = False
 
     # If no game was in progress, just refresh the lobby for remaining players
     if game.state == "LOBBY":
+        game.renumber_remaining_player_ids()
+        await game.notify_clients_player_ids()
         await game.broadcast_lobby_status()
         return
 
@@ -330,6 +337,9 @@ async def clean_player(player_name: str, ws: WebSocketServerProtocol):
             await send_json(client_ws, i, "id_registered", None)
         except Exception as e:
             print(f"[DEBUG] Failed to send id_registered to {name}: {e}")
+
+    game.next_player_id = len(game.players) + 1
+
 
     try:
         await game.broadcast("lobby_reset", player_name)

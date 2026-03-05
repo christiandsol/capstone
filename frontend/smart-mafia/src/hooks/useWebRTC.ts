@@ -28,6 +28,17 @@ export const useWebRTC = (
     const socketToStreamRef = useRef<{ [socketId: string]: MediaStream }>({});
     const mySocketIdRef = useRef<string | null>(null);
 
+    //Jesus's changes
+    const playerIdRef = useRef<number | null>(playerId);
+    const playerNameRef = useRef<string>(playerName);
+
+    useEffect(() => {
+        playerIdRef.current = playerId;
+        playerNameRef.current = playerName
+    }, [playerId, playerName])
+
+
+
     // Re-update playerId's when they change
     useEffect(() => {
         if (playerId === null || !socketRef.current?.connected) return;
@@ -173,15 +184,27 @@ export const useWebRTC = (
         };
 
         const sendPlayerInfoToPeer = (peerId: string) => {
-            if (playerId === null) return;
+            const currentId = playerIdRef.current;
+            const currentName = playerNameRef.current;
+            if (currentId === null) return;
 
-            console.log(`[Info] Sending player info to ${peerId}: ${playerName} (ID: ${playerId})`);
+            console.log(`[Info] Sending player info to ${peerId}: ${currentName} (ID: ${currentId})`);
             socketRef.current?.emit('player-info', {
                 to: peerId,
-                name: playerName,
-                id: playerId
+                name: currentName,
+                id: currentId
             });
         };
+        // const sendPlayerInfoToPeer = (peerId: string) => {
+        //     if (playerId === null) return;
+        //
+        //     console.log(`[Info] Sending player info to ${peerId}: ${playerName} (ID: ${playerId})`);
+        //     socketRef.current?.emit('player-info', {
+        //         to: peerId,
+        //         name: playerName,
+        //         id: playerId
+        //     });
+        // };
 
         const removeRemoteStreamsForSocketId = (socketId: string) => {
             console.log(`[Cleanup] Removing streams for socket: ${socketId}`);
