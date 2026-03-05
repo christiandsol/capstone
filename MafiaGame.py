@@ -456,7 +456,7 @@ class MafiaGame:
         if self.state == "HEADSDOWN_DOCTOR" and self.check_heads_down([]):
             self.state = "DOCTORVOTE"
             self.expected_signals = {"headUp", "headDown", "voiceCommand", "target"}
-            await self.broadcast("night_phase_kill")
+            await self.broadcast("night_phase_save")
             print("[DEBUG] Doctor voting")
             for doctor_name in self._active_doctor_names():
                 await self.request_action_from_rpi(doctor_name, "save")

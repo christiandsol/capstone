@@ -127,7 +127,6 @@ export const useGameSocket = (
                             const newStatus = `Lobby: ${ready_count}/${total_count} ready (min: ${min_players})`;
                             lastStatusRef.current = newStatus;
                             onStatusChange(newStatus);
-                            playTextToSpeech(newStatus);
                         }
                     }
 
@@ -145,10 +144,10 @@ export const useGameSocket = (
                         const newStatus = `Restart: ${restart_count}/${total_count} want to play again`;
                         lastStatusRef.current = newStatus;
                         onStatusChange(newStatus);
-                        playTextToSpeech(newStatus)
 
                         if (restart_count === total_count && total_count > 0) {
                             console.log('[Game] All players agreed to restart!');
+                            playTextToSpeech("All players agreed to restart")
                             setGameOverData(null);
                             setRole(null);
                             setDeadPlayers(new Set()); // Reset dead players on restart
@@ -267,6 +266,14 @@ export const useGameSocket = (
                     if (data.action === 'night_phase_kill') {
                         console.log('[Game] Night phase started');
                         const newStatus = 'Night Phase: Mafia is acting... Everyone else heads down';
+                        lastStatusRef.current = newStatus;
+                        onStatusChange(newStatus);
+                        playTextToSpeech(newStatus)
+                    }
+
+                    if (data.action === 'night_phase_save') {
+                        console.log('[Game] Night phase continues');
+                        const newStatus = 'Night Phase: Doctor is acting... Everyone else heads down';
                         lastStatusRef.current = newStatus;
                         onStatusChange(newStatus);
                         playTextToSpeech(newStatus)
