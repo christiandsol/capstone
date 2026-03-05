@@ -42,6 +42,7 @@ class MafiaGame:
 
         self.next_player_id: int = 1
 
+
     # ------------------------------------------------------------------
     # helpers
     # ------------------------------------------------------------------
@@ -343,6 +344,8 @@ class MafiaGame:
         self.state = "LOBBY"
         self.expected_signals = {"setup"}
 
+        self.stored_mafia_names = None
+
         print("[DEBUG] Game state reset complete")
 
 
@@ -398,6 +401,8 @@ class MafiaGame:
             self.state = "ASSIGN"
             self.expected_signals = set()
             self.game_started = True
+
+            self.stored_mafia_names = self._active_mafia_names()
 
         # ASSIGN: send roles and ask everyone to put heads down
         if self.state == "ASSIGN":
@@ -572,7 +577,7 @@ class MafiaGame:
         self.expected_signals = set()
         await self.broadcast("game_over", {
             "winner": winner,
-            "mafia": self._active_mafia_names(),
+            "mafia": self.stored_mafia_names,
         })
         await self.broadcast_restart_status()
 
