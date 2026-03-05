@@ -167,8 +167,8 @@ class MafiaGame:
                 self.players[m2]["kill"] = None
                 return target
             # Disagreement means reset both so they vote again
-            self.players[m1]["kill"] = None
-            self.players[m2]["kill"] = None
+            # self.players[m1]["kill"] = None
+            # self.players[m2]["kill"] = None
         return None
 
     def get_doctor_save_target(self) -> Optional[str]:
@@ -423,7 +423,10 @@ class MafiaGame:
                 await self.broadcast("head_down")
                 return 
             kill_target = self.get_mafia_kill_target()
-            if kill_target is None:
+            if kill_target is None and (self.mafia_count == 1 or self.players[self.mafia_name_one]["kill"] and self.players[self.mafia_name_two]["kill"]):
+                m1, m2 = self.mafia_name_one, self.mafia_name_two
+                self.players[m1]["kill"] = None
+                self.players[m2]["kill"] = None
                 print(f"[DEBUG] Kill Target is None")
                 for mafia_name in self._active_mafia_names():
                     await self.request_action_from_rpi(mafia_name, "kill")
