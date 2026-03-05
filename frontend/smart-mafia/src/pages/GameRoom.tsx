@@ -191,18 +191,9 @@ export default function GameRoom({ playerName, gameSocket, setStatus, status, on
             <div style={{ marginTop: '20px', fontSize: '18px' }}>
               <p>The Mafia were:</p>
               <div style={{ marginTop: '10px' }}>
-                {gameOverData.mafia.filter(m => m).map((mafiaName) => (
-                  <div key={mafiaName} style={{
-                    padding: '10px',
-                    background: '#8b0a15',
-                    borderRadius: '6px',
-                    marginBottom: '8px',
-                    fontSize: '20px',
-                    fontWeight: 'bold'
-                  }}>
-                    {mafiaName}
-                  </div>
-                ))}
+                <span style={{ fontWeight: 'bold', fontSize: '20px' }}>
+                  {gameOverData.mafia.filter(m => m).join(', ')}
+                </span>
               </div>
             </div>
 
