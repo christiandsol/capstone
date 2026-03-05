@@ -156,7 +156,7 @@ export default function GameRoom({ playerName, gameSocket, setStatus, status, on
         </h1>
       </div>
 
-   
+
 
 
 
@@ -390,7 +390,6 @@ export default function GameRoom({ playerName, gameSocket, setStatus, status, on
         <h2 style={{ marginTop: "30px" }}>
           My Video {sessionStorage.getItem("tabVideo") && `(${sessionStorage.getItem("tabVideo")})`}
         </h2>
-<<<<<<< Updated upstream
         <div style={{ position: "relative", display: "inline-block" }}>
           <video
             ref={localVideoRef}
@@ -442,46 +441,6 @@ export default function GameRoom({ playerName, gameSocket, setStatus, status, on
             </div>
           )}
         </div>
-=======
-          {/* Video and overlay block in same relative container */}
-          <div style={{ position: 'relative', width: '320px', margin: '0' }}>
-            <video
-              ref={localVideoRef}
-              autoPlay
-              playsInline
-              muted
-              style={{
-                width: "320px",
-                height: "240px",
-                background: "#000",
-                border: "3px solid #0066cc",
-                borderRadius: "8px",
-                boxShadow: "0 4px 12px rgba(0,102,204,0.3)"
-              }}
-            />
-            {(playerName || playerId) && (
-              <div
-                style={{
-                  position: 'absolute',
-                  bottom: '0',
-                  left: '0',
-                  right: '0',
-                  background: 'rgba(0, 0, 0, 0.7)',
-                  color: 'white',
-                  padding: '8px',
-                  borderRadius: '0 0 8px 8px',
-                  fontSize: '14px',
-                  fontWeight: 'bold',
-                  textAlign: 'center'
-                }}
-              >
-                {playerName && <div>{playerName}</div>}
-                {playerId && <div style={{ fontSize: '12px', opacity: 0.9 }}>ID: {playerId}</div>}
-              </div>
-            )}
-          </div>
->>>>>>> Stashed changes
-
         <h2 style={{ marginTop: "40px" }}>
           Other Players ({remoteStreams && remoteStreams.length})
         </h2>
@@ -504,7 +463,7 @@ export default function GameRoom({ playerName, gameSocket, setStatus, status, on
         </div>
       </div>
 
-      
+
       <section style={{
         margin: '40px auto 0 auto',
         maxWidth: '1000px',
@@ -522,7 +481,7 @@ export default function GameRoom({ playerName, gameSocket, setStatus, status, on
 
             <img src={imuDiagram} alt="IMU Directions for Voting" style={{ maxWidth: '340px', width: '100%', height: 'auto', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }} />
             <div style={{ marginTop: '0.5rem', fontSize: '1.1rem', color: '#ffd700', textAlign: 'center' }}>
-             Move your IMU as shown to select the ID of the player you choose
+              Move your IMU as shown to select the ID of the player you choose
             </div>
           </div>
           <div style={{ flex: '1', minWidth: '260px' }}>
